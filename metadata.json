@@ -1,0 +1,8 @@
+{
+  "name": "AlSHams Craft ERP | منصة الشمس كرافت",
+  "description": "منظومة الشمس كرافت السحابية المتكاملة لإدارة وتكاليف ورش المكرمية والمشغولات اليدوية وحسابات الحرفيين (ERP & SaaS)",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
