@@ -1,17 +1,21 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
-import admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { aiProvider } from './server/aiProvider';
-import firebaseConfig from './firebase-applet-config.json';
+
+const firebaseConfig = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8')
+);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // Initialize Firebase Admin SDK for backend ID token authentication
-if (!admin.apps.length) {
+if (getApps().length === 0) {
   try {
-    admin.initializeApp({
+    initializeApp({
       projectId: firebaseConfig.projectId,
     });
     console.log(`Firebase Admin initialized for project: ${firebaseConfig.projectId}`);
@@ -62,7 +66,7 @@ async function requireFirebaseAuth(req: Request, res: Response, next: NextFuncti
 
   const idToken = authHeader.split('Bearer ')[1].trim();
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
     (req as any).user = decodedToken;
     next();
   } catch (err: any) {

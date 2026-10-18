@@ -54,7 +54,8 @@ export class GeminiAIProvider {
       throw new Error('مفتاح GEMINI_API_KEY غير مضبوط على الخادم');
     }
 
-    const { imageBase64, mimeType, artistNotes, activeCrafts = [] } = input;
+       const { imageBase64, mimeType, artistNotes } = input;
+    const activeCrafts = Array.isArray(input.activeCrafts) ? input.activeCrafts : [];
 
     // Normalize base64 string
     let cleanBase64 = imageBase64;
@@ -177,7 +178,14 @@ ${craftsContextText}
 سياق الورشة والحرفي الحالي:
 ${JSON.stringify(currentContext, null, 2)}`;
 
-    const contents = [...chatHistory];
+       const mappedHistory = (Array.isArray(chatHistory) ? chatHistory : [])
+      .map((m: any) => ({
+        role: m.role === 'model' || m.sender === 'falcon' ? 'model' : 'user',
+        parts: m.parts ?? [{ text: String(m.text ?? '') }],
+      }))
+      .filter((m: any) => m.parts?.[0]?.text);
+    while (mappedHistory.length && mappedHistory[0].role === 'model') mappedHistory.shift();
+    const contents: any[] = [...mappedHistory];
     contents.push({
       role: 'user',
       parts: [
