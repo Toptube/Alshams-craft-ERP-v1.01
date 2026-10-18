@@ -197,7 +197,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       }
 
       await tenantStorage.wipeDatabaseWithAuth(
-        profile.tenantId,
+        profile.tenantId || profile.workshopId || profile.id,
         resetPassword,
         resetReason,
         profile.email

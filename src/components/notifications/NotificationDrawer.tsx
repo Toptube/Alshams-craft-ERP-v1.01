@@ -49,14 +49,16 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   };
 
   const handleMarkAllRead = async () => {
-    await tenantStorage.markAllNotificationsAsRead(profile.tenantId);
+    const targetTenantId = profile.tenantId || profile.workshopId || profile.id;
+    await tenantStorage.markAllNotificationsAsRead(targetTenantId);
     onRefreshNotifications();
   };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     setUpdatingOrderId(orderId);
     try {
-      await tenantStorage.updateOrderStatus(profile.tenantId, orderId, newStatus);
+      const targetTenantId = profile.tenantId || profile.workshopId || profile.id;
+      await tenantStorage.updateOrderStatus(targetTenantId, orderId, newStatus);
       setSelectedOrderIdForStatus(null);
       onRefreshNotifications();
     } catch (err) {

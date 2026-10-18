@@ -97,7 +97,16 @@ export default function App() {
     if (currentProfile) {
       loadNotifications();
       const interval = setInterval(loadNotifications, 60000);
-      return () => clearInterval(interval);
+
+      const handleRealtimeNotif = () => {
+        loadNotifications();
+      };
+      window.addEventListener('alshams_notifications_changed', handleRealtimeNotif);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('alshams_notifications_changed', handleRealtimeNotif);
+      };
     }
   }, [currentProfile, loadNotifications]);
 

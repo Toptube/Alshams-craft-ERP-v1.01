@@ -40,6 +40,7 @@ export const NewMaterialModal: React.FC<{
   const [unit, setUnit] = useState<any>('كيلو');
   const [initialStock, setInitialStock] = useState(10);
   const [costPerUnit, setCostPerUnit] = useState(180);
+  const [minAlertThreshold, setMinAlertThreshold] = useState(5);
   const [supplierName, setSupplierName] = useState('مغزل المحلة');
   const [warehouseLocation, setWarehouseLocation] = useState('المخزن الرئيسي');
 
@@ -59,7 +60,8 @@ export const NewMaterialModal: React.FC<{
       supplierName: supplierName.trim() || 'مورد عام',
       warehouseLocation: warehouseLocation.trim() || 'المخزن الرئيسي',
       lastPurchaseDate: new Date().toISOString().split('T')[0],
-      minAlertThreshold: 5,
+      minAlertThreshold: Number(minAlertThreshold) || 5,
+      reorderLevel: Number(minAlertThreshold) || 5,
       isActive: true,
     };
 
@@ -152,6 +154,30 @@ export const NewMaterialModal: React.FC<{
               className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold text-center"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold mb-1">
+            حد الطلب الأدنى (مستوى الأمان للتنبيه التلقائي في الجرس) *
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              required
+              value={minAlertThreshold}
+              onChange={(e) => setMinAlertThreshold(Number(e.target.value))}
+              placeholder="5"
+              className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50/50 dark:bg-amber-950/20 font-mono text-xs font-bold outline-none"
+            />
+            <span className="absolute left-3 top-2 text-[10px] text-amber-700 dark:text-amber-400 font-bold">
+              {unit}
+            </span>
+          </div>
+          <span className="text-[10px] text-stone-500 dark:text-stone-400 block mt-0.5">
+            * سيظهر إشعار فوري في الجرس عند وصول الرصيد إلى أو أقل من هذا الحد.
+          </span>
         </div>
 
         <div>

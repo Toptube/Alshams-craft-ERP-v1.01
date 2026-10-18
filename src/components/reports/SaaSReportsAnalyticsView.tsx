@@ -234,12 +234,12 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
     const headers = ['رقم الطلبية', 'العميل', 'التاريخ', 'الإجمالي', 'المدفوع', 'المتبقي', 'الخزينة'];
     const rows = orders.map((o) => [
       o.id,
-      o.customerName,
-      o.date,
-      String(o.finalTotal),
-      String(o.amountPaid),
-      String(o.remainingAmount),
-      o.safeType === 'main' ? 'خزينة رئيسية' : 'خزينة فرعية',
+      o.customerName || 'عميل',
+      o.date || '',
+      String(o.finalTotal || o.totalAmount || 0),
+      String(o.amountPaid || o.paidAmount || 0),
+      String(o.remainingAmount || 0),
+      (o.safeType || 'main') === 'main' ? 'خزينة رئيسية' : 'خزينة فرعية',
     ]);
     exportToExcelCSV('سجل_المبيعات_الشمس_كرافت', [headers, ...rows]);
   };
@@ -255,7 +255,7 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
 
     try {
       await tenantStorage.wipeDatabaseWithAuth(
-        profile.tenantId,
+        profile.tenantId || profile.workshopId || profile.id,
         wipePassword,
         wipeReason,
         profile.email
@@ -815,7 +815,7 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
                         كشف حساب المورد: {selectedSupplierForStatement.name}
                       </h3>
                       <p className="text-xs text-stone-500">
-                        {selectedSupplierForStatement.companyName} • {selectedSupplierForStatement.phoneNumber}
+                        {selectedSupplierForStatement.companyName || ''} • {selectedSupplierForStatement.phoneNumber || selectedSupplierForStatement.phone || ''}
                       </p>
                     </div>
                   </div>

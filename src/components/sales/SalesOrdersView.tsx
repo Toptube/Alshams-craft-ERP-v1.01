@@ -64,7 +64,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
   const [shippingCost, setShippingCost] = useState<number>(50);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [safeType, setSafeType] = useState<SafeType>('main');
+  const [safeType, setSafeType] = useState<string>('main');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [assignedEmployeeId, setAssignedEmployeeId] = useState<string>('');
 
@@ -104,10 +104,11 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
   // Load active data
   const loadData = async () => {
     try {
-      const ords = await tenantStorage.getOrders(profile.tenantId);
-      const custs = await tenantStorage.getCustomers(profile.tenantId);
-      const prods = await tenantStorage.getProducts(profile.tenantId);
-      const emps = await tenantStorage.getEmployees(profile.tenantId);
+      const tId = profile.tenantId || profile.workshopId || profile.id;
+      const ords = await tenantStorage.getOrders(tId);
+      const custs = await tenantStorage.getCustomers(tId);
+      const prods = await tenantStorage.getProducts(tId);
+      const emps = await tenantStorage.getEmployees(tId);
 
       setOrders(ords);
       setCustomers(custs);
@@ -148,9 +149,11 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
     const qty = Math.max(1, itemQuantity);
 
     const newLine: OrderLineItem = {
+      id: 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
       productId: prod?.id,
       productName: name,
       category,
+      unit: 'قطعة',
       quantity: qty,
       unitPrice: price,
       totalPrice: price * qty,
@@ -192,8 +195,8 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
   // Filtered dropdown matrices (عدسة البحث)
   const filteredCustomers = customers.filter(
     (c) =>
-      c.fullName.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-      c.phoneNumber.includes(clientSearchQuery)
+      (c.fullName || c.name || '').toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+      (c.phoneNumber || c.phone || '').includes(clientSearchQuery)
   );
 
   const filteredProducts = products.filter((p) =>
@@ -213,9 +216,11 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
       const prod = products.find((p) => p.id === selectedProductId);
       if (prod) {
         finalItems.push({
+          id: 'item_' + Date.now(),
           productId: prod.id,
           productName: prod.productName,
           category: prod.category,
+          unit: 'قطعة',
           quantity: Math.max(1, itemQuantity),
           unitPrice: itemCustomPrice > 0 ? itemCustomPrice : prod.output.finalSellingPrice,
           totalPrice: (itemCustomPrice > 0 ? itemCustomPrice : prod.output.finalSellingPrice) * Math.max(1, itemQuantity),
@@ -230,25 +235,30 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
 
     const customer = customers.find((c) => c.id === selectedCustomerId);
     const assignedEmp = employees.find((e) => e.id === assignedEmployeeId);
+    const targetTenantId = profile.tenantId || profile.workshopId || profile.id;
 
     const newOrder: CustomerOrder = {
       id: 'ord_' + Date.now(),
-      tenantId: profile.tenantId,
+      workshopId: targetTenantId,
+      tenantId: targetTenantId,
       customerId: selectedCustomerId,
-      customerName: customer ? customer.fullName : 'عميل عام',
-      customerPhone: customer?.phoneNumber,
+      customerName: customer ? (customer.fullName || customer.name) : 'عميل عام',
+      customerPhone: customer?.phoneNumber || customer?.phone || '',
       items: finalItems,
-      totalItemsPrice,
-      shippingCost: Number(shippingCost) || 0,
+      subtotal: totalItemsPrice,
+      shipping: Number(shippingCost) || 0,
       discount: Number(discountAmount) || 0,
+      vatEnabled: false,
+      vatPercent: 0,
+      vatAmount: 0,
+      returnsTotal: 0,
+      totalAmount: finalTotal,
       finalTotal,
-      safeType,
-      paymentMethod,
-      paymentStatus: remaining === 0 ? 'paid' : effectiveAmountPaid > 0 ? 'deposit' : 'pending',
+      paidAmount: effectiveAmountPaid,
       amountPaid: effectiveAmountPaid,
       remainingAmount: remaining,
+      safeType,
       deliveryDate,
-      isSinglePayment,
       depositPhases: isSinglePayment
         ? undefined
         : {
@@ -265,13 +275,17 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
       assignedEmployeeId: assignedEmp?.id,
       assignedEmployeeName: assignedEmp?.fullName,
       assignedEmployeeWage: assignedEmp ? 150 : undefined,
+      payments: [],
+      returns: [],
       date: new Date().toISOString().split('T')[0],
       status: 'in_progress',
       createdAt: Date.now(),
+      updatedAt: Date.now(),
+      createdBy: profile.email,
     };
 
     await tenantStorage.recordSalesOrder(newOrder);
-    await tenantStorage.generateProactiveNotifications(profile.tenantId);
+    await tenantStorage.generateProactiveNotifications(targetTenantId);
     await loadData();
 
     if (mode === 'save_and_share') {
@@ -855,7 +869,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                     </td>
                     <td className="p-3 font-sans text-stone-600 dark:text-stone-300">
                       {ord.items && ord.items.length > 0
-                        ? ord.items.map((i) => `${i.productName} (${i.quantity})`).join(', ')
+                        ? ord.items.map((i: any) => `${i.productName} (${i.quantity})`).join(', ')
                         : 'منتج حرفي'}
                     </td>
                     <td className="p-3 font-bold text-emerald-700 dark:text-emerald-400">

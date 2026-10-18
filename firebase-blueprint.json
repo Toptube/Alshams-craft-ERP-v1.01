@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "Workshop": {
+      "title": "Workshop",
+      "description": "Multi-tenant workshop account document owned by artisan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "brandName": { "type": "string" },
+        "artistName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "currency": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "selectedCrafts": { "type": "array", "items": { "type": "string" } },
+        "defaultVatPercent": { "type": "number" },
+        "commercialRegister": { "type": "string" },
+        "taxCardNumber": { "type": "string" },
+        "showTaxInfoOnInvoice": { "type": "boolean" },
+        "logoBase64": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "ownerUid", "brandName", "createdAt", "updatedAt"]
+    },
+    "Treasury": {
+      "title": "Treasury",
+      "description": "Financial treasury (cash, instapay, wallet, bank)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["cash", "instapay", "wallet", "bank"] },
+        "balance": { "type": "number" },
+        "isMain": { "type": "boolean" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "balance", "createdAt"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Sales invoice with multi-installment payments and returns",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "shipping": { "type": "number" },
+        "vatEnabled": { "type": "boolean" },
+        "vatAmount": { "type": "number" },
+        "returnsTotal": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["unpaid", "partially_paid", "paid"] },
+        "periodId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "invoiceNumber", "customerId", "totalAmount", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "indexes": []
+  }
+}

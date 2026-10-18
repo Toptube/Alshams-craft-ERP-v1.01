@@ -73,16 +73,60 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
     'توقع الأبعاد والتكلفة والمصنعية',
   ];
 
+  // Client-side image compression to optimize speed & guarantee Gemini vision compatibility
+  const compressImageForAI = (file: File): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const rawResult = event.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1280;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({ base64: rawResult, mimeType: file.type || 'image/jpeg' });
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          resolve({ base64: compressed, mimeType: 'image/jpeg' });
+        };
+        img.onerror = () => {
+          resolve({ base64: rawResult, mimeType: file.type || 'image/jpeg' });
+        };
+        img.src = rawResult;
+      };
+      reader.onerror = () => {
+        resolve({ base64: '', mimeType: 'image/jpeg' });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle Vision Image Upload & Real AI / Vision Processing
   const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      setImagePreview(base64);
+    try {
       setIsAnalyzingImage(true);
+      const { base64, mimeType } = await compressImageForAI(file);
+      if (!base64) throw new Error('فشل قراءة ملف الصورة');
+
+      setImagePreview(base64);
 
       // Add user message with thumbnail
       setMessages((prev) => [
@@ -95,68 +139,66 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
         },
       ]);
 
-      try {
-        const res = await fetch('/api/analyze-vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64,
-            mimeType: file.type || 'image/jpeg',
-            artistNotes: inputPrompt || '',
-          }),
-        });
+      const res = await fetch('/api/analyze-vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64,
+          mimeType: mimeType || 'image/jpeg',
+          artistNotes: inputPrompt || '',
+        }),
+      });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || errData.detail || 'فشل اتصال الرؤية الحاسوبية');
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.detail || 'فشل اتصال الرؤية الحاسوبية');
+      }
 
-        const data: AIVisionAnalysis = await res.json();
-        setVisionAnalysis(data);
+      const data: AIVisionAnalysis = await res.json();
+      setVisionAnalysis(data);
 
-        // 1. Shift category immediately
-        if (data.detectedCategory) {
-          onApplyCategoryFromAI(data.detectedCategory);
-        }
+      // 1. Shift category immediately
+      if (data.detectedCategory) {
+        onApplyCategoryFromAI(data.detectedCategory);
+      }
 
-        // 2. Autofill estimated hours * 30 internal wage
-        if (data.estimatedLaborWage) {
-          onApplyEstimatedLaborWage(data.estimatedLaborWage, data.estimatedHours);
-        }
+      // 2. Autofill estimated hours * 30 internal wage
+      if (data.estimatedLaborWage) {
+        onApplyEstimatedLaborWage(data.estimatedLaborWage, data.estimatedHours);
+      }
 
-        // Add Falcon response message
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: 'falcon_res_' + Date.now(),
-            sender: 'falcon',
-            text: `🎯 تم استيعاب الصورة بنجاح عبر صقر الشمساوية AI!
+      // Add Falcon response message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'falcon_res_' + Date.now(),
+          sender: 'falcon',
+          text: `🎯 تم استيعاب الصورة وتحليلها هندسياً بنجاح عبر صقر الشمساوية AI!
 - التصنيف المكتشف فورياً: **${data.detectedCategory}** (تم تحويل الحاسبة إليه تلقائياً).
 - الساعات التقديرية للعمل اليدوي: **${data.estimatedHours} ساعة**.
 - أجرة المصنعية المقترحة: **${data.estimatedLaborWage} ${profile.currencySymbol}**.
-- شريحة تسعير السوق: من ${data.competitionPricing.minMarketPrice} إلى ${data.competitionPricing.maxMarketPrice} ${profile.currencySymbol}.
+- شريحة تسعير السوق: من ${data.competitionPricing?.minMarketPrice || 0} إلى ${data.competitionPricing?.maxMarketPrice || 0} ${profile.currencySymbol}.
 
 راجعي أدناه الباترون التخطيطي التفاعلي والمصفوفة التنافسية!`,
-            timestamp: Date.now(),
-            metadata: data,
-          },
-        ]);
-      } catch (err: any) {
-        console.error('AI Vision error:', err);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: 'err_' + Date.now(),
-            sender: 'falcon',
-            text: `⚠️ ${err.message || 'عذراً يا فنان، تعذر معالجة الصورة حالياً.'}`,
-            timestamp: Date.now(),
-          },
-        ]);
-      } finally {
-        setIsAnalyzingImage(false);
-      }
-    };
-    reader.readAsDataURL(file);
+          timestamp: Date.now(),
+          metadata: data,
+        },
+      ]);
+    } catch (err: any) {
+      console.error('AI Vision error:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'err_' + Date.now(),
+          sender: 'falcon',
+          text: `⚠️ ${err.message || 'عذراً يا فنان، تعذر معالجة الصورة حالياً.'}`,
+          timestamp: Date.now(),
+        },
+      ]);
+    } finally {
+      setIsAnalyzingImage(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // Send Chat message

@@ -1,0 +1,70 @@
+rules_version = '2';
+
+/**
+ * Al-Shams Craft ERP - Multi-Tenant Security Rules
+ *
+ * HOW TO TEST ISOLATION WITH TWO ACCOUNTS (اختبار العزل بحسابين):
+ * 1. أنشئ حسابين مختلفين: الحساب الأول (userA@example.com) والحساب الثاني (userB@example.com).
+ * 2. عند تسجيل الدخول بـ userA، يكون معرف ورشته workshops/userA_UID. يمكنه قراءة وكتابة بيانات ورشته فقط.
+ * 3. حاول استدعاء قراءة مستند من ورشة userB باستخدام معرف الحساب userA:
+ *    get(/databases/{db}/documents/workshops/{userB_UID}/invoices/{anyInvoice})
+ * 4. ستُرجع القواعد فوراً `permission-denied` لأن request.auth.uid لا يساوي userB_UID ولا يوجد مستند في members.
+ * 5. تسجيل الدخول بـ userA من هاتف آخر يتيح له رؤية نفس بيانات ورشته ومزامنتها فورياً عبر persistentLocalCache.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isWorkshopOwner(workshopId) {
+      return isAuthenticated() && request.auth.uid == workshopId;
+    }
+
+    function isWorkshopMember(workshopId) {
+      return isAuthenticated() && (
+        request.auth.uid == workshopId ||
+        exists(/databases/$(database)/documents/workshops/$(workshopId)/members/$(request.auth.uid))
+      );
+    }
+
+    function isPlatformAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // 1. Multi-tenant Workshops Isolation (الورش المستأجرة وعزل البيانات الكامل)
+    match /workshops/{workshopId} {
+      // Direct workshop document read/write (owner or member)
+      allow read, write: if isWorkshopMember(workshopId);
+
+      // All sub-collections: products, materials, warehouses, stockMovements, workOrders,
+      // suppliers, supplierInvoices, customers, invoices, returns, treasuries,
+      // treasuryTransactions, expenses, revenues, employees, payrolls, payslips,
+      // periods, activityLogs, counters, stats, aiFeedback, members
+      match /{allSubcollections=**} {
+        allow read, write: if isWorkshopMember(workshopId);
+      }
+    }
+
+    // 2. Shared Crafts Knowledge Base (مكتبة المعرفة الحرفية العامة)
+    match /knowledge/{craft}/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isPlatformAdmin();
+    }
+
+    // 3. Platform Admins Registry
+    match /admins/{adminId} {
+      allow read: if isAuthenticated() && request.auth.uid == adminId;
+      allow write: if false; // Provisioned via server/console only
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

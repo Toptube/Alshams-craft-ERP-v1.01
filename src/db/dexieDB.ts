@@ -190,6 +190,91 @@ export const tenantStorage = {
       notes: notes || `شراء أصول خامات من المورد ${supplierName}`,
       date: new Date().toISOString().split('T')[0],
     });
+
+    // Proactively refresh notifications
+    await this.generateProactiveNotifications(tenantId);
+  },
+
+  async recordMaterialConsumption(
+    tenantId: string,
+    itemId: string,
+    quantity: number,
+    notes: string = 'صرف خامات للتشغيل والإنتاج'
+  ): Promise<void> {
+    const item = await db.rawMaterials.get(itemId);
+    if (!item || item.tenantId !== tenantId) {
+      throw new Error('الخامة غير موجودة في مخزن الورشة');
+    }
+    if (quantity <= 0) {
+      throw new Error('يجب إدخال كمية صرف موجبة أكبر من الصفر');
+    }
+
+    item.currentStock = Math.max(0, Number((item.currentStock - quantity).toFixed(3)));
+    await db.rawMaterials.put(item);
+
+    await db.inventoryTransactions.add({
+      id: 'tx_' + Math.random().toString(36).substring(2, 9),
+      tenantId,
+      itemId,
+      materialName: item.materialName,
+      type: 'production_out',
+      quantity,
+      unitCost: item.costPerUnit,
+      totalCost: Math.round(quantity * item.costPerUnit),
+      notes: notes || 'صرف خامات للتشغيل في الورشة',
+      date: new Date().toISOString().split('T')[0],
+    });
+
+    // Check low stock and alert bell immediately!
+    await this.generateProactiveNotifications(tenantId);
+  },
+
+  async adjustMaterialStock(
+    tenantId: string,
+    itemId: string,
+    newActualStock: number,
+    reason: string = 'تسوية جردية فعلية'
+  ): Promise<void> {
+    const item = await db.rawMaterials.get(itemId);
+    if (!item || item.tenantId !== tenantId) {
+      throw new Error('الخامة غير موجودة في مخزن الورشة');
+    }
+    const diff = Number((newActualStock - item.currentStock).toFixed(3));
+    item.currentStock = Number(newActualStock.toFixed(3));
+    await db.rawMaterials.put(item);
+
+    await db.inventoryTransactions.add({
+      id: 'tx_' + Math.random().toString(36).substring(2, 9),
+      tenantId,
+      itemId,
+      materialName: item.materialName,
+      type: 'audit_adjustment',
+      quantity: Math.abs(diff),
+      unitCost: item.costPerUnit,
+      totalCost: Math.round(Math.abs(diff) * item.costPerUnit),
+      notes: `${reason} (تعديل الرصيد من ${Number((item.currentStock - diff).toFixed(3))} إلى ${newActualStock})`,
+      date: new Date().toISOString().split('T')[0],
+    });
+
+    // Trigger proactive notification check immediately
+    await this.generateProactiveNotifications(tenantId);
+  },
+
+  async updateMaterialReorderThreshold(
+    tenantId: string,
+    itemId: string,
+    newThreshold: number
+  ): Promise<void> {
+    const item = await db.rawMaterials.get(itemId);
+    if (!item || item.tenantId !== tenantId) {
+      throw new Error('الخامة غير موجودة في مخزن الورشة');
+    }
+    item.minAlertThreshold = Number(newThreshold) || 0;
+    item.reorderLevel = item.minAlertThreshold;
+    await db.rawMaterials.put(item);
+
+    // Refresh notifications immediately against the new threshold
+    await this.generateProactiveNotifications(tenantId);
   },
 
   async getInventoryTransactions(tenantId: string): Promise<InventoryTransaction[]> {
@@ -219,7 +304,9 @@ export const tenantStorage = {
   async saveRawMaterial(material: RawMaterialItem): Promise<void> {
     material.costPerGram = material.unit === 'كيلو' ? material.costPerUnit / 1000 : material.costPerUnit;
     material.isActive = material.isActive !== false;
+    material.minAlertThreshold = Number(material.minAlertThreshold ?? material.reorderLevel ?? 5);
     await db.rawMaterials.put(material);
+    await this.generateProactiveNotifications(material.tenantId || material.workshopId || 'default');
   },
 
   async deactivateRawMaterial(tenantId: string, id: string, reason: string, userEmail: string): Promise<void> {
@@ -257,8 +344,10 @@ export const tenantStorage = {
 
     // Update material stocks & unit prices dynamically
     for (const line of invoice.items) {
+      if (!line.materialId) continue;
+      const targetTenantId = invoice.tenantId || invoice.workshopId;
       let material = await db.rawMaterials.get(line.materialId);
-      if (material && material.tenantId === invoice.tenantId) {
+      if (material && (material.tenantId === targetTenantId || material.workshopId === targetTenantId)) {
         material.currentStock = Number((material.currentStock + line.quantity).toFixed(3));
         material.costPerUnit = line.unitCost;
         material.costPerGram = material.unit === 'كيلو' ? line.unitCost / 1000 : line.unitCost;
@@ -270,7 +359,7 @@ export const tenantStorage = {
         // Inventory log
         await db.inventoryTransactions.add({
           id: 'tx_' + Math.random().toString(36).substring(2, 9),
-          tenantId: invoice.tenantId,
+          tenantId: targetTenantId,
           itemId: material.id,
           materialName: material.materialName,
           type: 'purchase_in',
@@ -285,9 +374,9 @@ export const tenantStorage = {
 
     // Update supplier balance
     const supplier = await db.suppliers.get(invoice.supplierId);
-    if (supplier && supplier.tenantId === invoice.tenantId) {
-      supplier.totalPurchases += invoice.totalAmount;
-      supplier.totalPaid += invoice.paidAmount;
+    if (supplier && (supplier.tenantId === (invoice as any).tenantId || supplier.workshopId === invoice.workshopId)) {
+      supplier.totalPurchases = (supplier.totalPurchases || 0) + invoice.totalAmount;
+      supplier.totalPaid = (supplier.totalPaid || 0) + invoice.paidAmount;
       supplier.outstandingBalance = Math.max(0, supplier.totalPurchases - supplier.totalPaid);
       await db.suppliers.put(supplier);
     }
@@ -296,15 +385,18 @@ export const tenantStorage = {
     if (invoice.paidAmount > 0) {
       await this.recordSafeTransaction({
         id: 'stx_' + Date.now(),
-        tenantId: invoice.tenantId,
-        safeType: invoice.safeType || 'main',
-        type: 'expense_purchase',
+        workshopId: invoice.workshopId,
+        tenantId: (invoice as any).tenantId || invoice.workshopId,
+        safeType: (invoice as any).safeType || 'main',
+        treasuryId: (invoice as any).safeType || 'main',
+        treasuryName: (invoice as any).safeType === 'sub' ? 'الخزنة الفرعية' : 'الخزنة الرئيسية',
+        type: 'expense',
         amount: -invoice.paidAmount,
-        balanceAfter: 0, // computed in recordSafeTransaction
-        description: `سداد فاتورة مشتريات خامات للمورد: ${invoice.supplierName}`,
-        relatedId: invoice.id,
+        balanceAfter: 0,
+        notes: `سداد فاتورة مشتريات خامات للمورد: ${invoice.supplierName}`,
         date: invoice.date,
         createdAt: Date.now(),
+        createdBy: 'system',
       });
     }
   },
@@ -335,38 +427,44 @@ export const tenantStorage = {
     await db.orders.put(order);
 
     // Update customer stats
-    const customer = await db.customers.get(order.customerId);
-    if (customer && customer.tenantId === order.tenantId) {
-      const orders = await db.orders.where('customerId').equals(order.customerId).toArray();
-      const totalPurchases = orders.reduce((sum, o) => sum + (o.finalTotal || 0), 0);
-      const totalPaid = orders.reduce((sum, o) => sum + (o.amountPaid || 0), 0);
-      customer.totalPurchases = totalPurchases;
-      customer.outstandingBalance = Math.max(0, totalPurchases - totalPaid);
-      await db.customers.put(customer);
+    if (order.customerId) {
+      const customer = await db.customers.get(order.customerId);
+      if (customer && (customer.tenantId === order.tenantId || customer.workshopId === order.workshopId)) {
+        const orders = await db.orders.where('customerId').equals(order.customerId).toArray();
+        const totalPurchases = orders.reduce((sum, o) => sum + (o.finalTotal || o.totalAmount || 0), 0);
+        const totalPaid = orders.reduce((sum, o) => sum + (o.amountPaid || o.paidAmount || 0), 0);
+        customer.totalPurchases = totalPurchases;
+        customer.outstandingBalance = Math.max(0, totalPurchases - totalPaid);
+        await db.customers.put(customer);
+      }
     }
 
     // Deposit received amount into chosen safe
-    if (order.amountPaid > 0) {
+    const paid = order.amountPaid || order.paidAmount || 0;
+    if (paid > 0) {
       await this.recordSafeTransaction({
         id: 'stx_' + Date.now(),
-        tenantId: order.tenantId,
+        workshopId: order.workshopId || order.tenantId,
+        tenantId: order.tenantId || order.workshopId || 'default',
         safeType: order.safeType || 'main',
-        type: 'income_sale',
-        amount: order.amountPaid,
+        treasuryId: order.safeType || 'main',
+        treasuryName: order.safeType === 'sub' ? 'الخزنة الفرعية' : 'الخزنة الرئيسية',
+        type: 'deposit',
+        amount: paid,
         balanceAfter: 0,
-        description: `تحصيل مبيعات طلبية #${order.id.slice(-4)} للعميل: ${order.customerName}`,
-        relatedId: order.id,
-        date: order.date,
+        notes: `تحصيل مبيعات طلبية #${order.id.slice(-4)} للعميل: ${order.customerName}`,
+        date: order.date || new Date().toISOString().split('T')[0],
         createdAt: Date.now(),
+        createdBy: 'system',
       });
     }
 
     // If employee was assigned with piece-rate wage, credit their balance
     if (order.assignedEmployeeId && order.assignedEmployeeWage && order.assignedEmployeeWage > 0) {
       const employee = await db.employees.get(order.assignedEmployeeId);
-      if (employee && employee.tenantId === order.tenantId) {
-        employee.totalEarned += order.assignedEmployeeWage;
-        employee.currentBalance += order.assignedEmployeeWage;
+      if (employee && (employee.tenantId === order.tenantId || employee.workshopId === order.workshopId)) {
+        employee.totalEarned = (employee.totalEarned || 0) + order.assignedEmployeeWage;
+        employee.currentBalance = (employee.currentBalance || 0) + order.assignedEmployeeWage;
         await db.employees.put(employee);
       }
     }
@@ -388,24 +486,27 @@ export const tenantStorage = {
 
     // Update employee balance
     const employee = await db.employees.get(payout.employeeId);
-    if (employee && employee.tenantId === payout.tenantId) {
-      employee.totalPaid += payout.amount;
-      employee.currentBalance = Math.max(0, employee.totalEarned - employee.totalPaid);
+    if (employee && (employee.tenantId === payout.tenantId || employee.workshopId === payout.workshopId)) {
+      employee.totalPaid = (employee.totalPaid || 0) + payout.amount;
+      employee.currentBalance = Math.max(0, (employee.totalEarned || 0) - employee.totalPaid);
       await db.employees.put(employee);
     }
 
     // Record as operating expense in designated Safe
     await this.recordSafeTransaction({
       id: 'stx_' + Date.now(),
-      tenantId: payout.tenantId,
+      workshopId: payout.workshopId || payout.tenantId,
+      tenantId: payout.tenantId || payout.workshopId || 'default',
       safeType: payout.safeType || 'main',
-      type: 'expense_payroll',
-      amount: -payout.amount,
+      treasuryId: payout.safeType || 'main',
+      treasuryName: payout.safeType === 'sub' ? 'الخزنة الفرعية' : 'الخزنة الرئيسية',
+      type: 'expense',
+      amount: -Number(payout.amount || payout.paidAmount || 0),
       balanceAfter: 0,
-      description: `صرف ${payout.type === 'advance' ? 'سلفة' : 'أجر/مصنعية'} للموظف: ${payout.employeeName}`,
-      relatedId: payout.id,
-      date: payout.date,
+      notes: `صرف ${payout.type === 'advance' ? 'سلفة' : 'أجر/مصنعية'} للموظف: ${payout.employeeName}`,
+      date: payout.date || new Date().toISOString().split('T')[0],
       createdAt: Date.now(),
+      createdBy: 'system',
     });
   },
 
@@ -434,7 +535,8 @@ export const tenantStorage = {
   },
 
   async recordSafeTransaction(tx: SafeTransaction): Promise<void> {
-    const balances = await this.getSafeBalances(tx.tenantId);
+    const tenantId = tx.tenantId || tx.workshopId || 'default';
+    const balances = await this.getSafeBalances(tenantId);
     const current = tx.safeType === 'main' ? balances.mainSafe : balances.subSafe;
     tx.balanceAfter = current + tx.amount;
     await db.safeTransactions.put(tx);
@@ -454,7 +556,7 @@ export const tenantStorage = {
     if (monthFilter) {
       items = items.filter((x) => x.month === monthFilter);
     }
-    return items.sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+    return items.sort((a, b) => (b.paymentDate || b.date || '').localeCompare(a.paymentDate || a.date || ''));
   },
 
   async addAdminCost(cost: AdminCostRecord): Promise<void> {
@@ -463,15 +565,18 @@ export const tenantStorage = {
     // Deduct from safe
     await this.recordSafeTransaction({
       id: 'stx_' + Date.now(),
-      tenantId: cost.tenantId,
+      workshopId: cost.workshopId || cost.tenantId,
+      tenantId: cost.tenantId || cost.workshopId || 'default',
       safeType: cost.safeType || 'main',
-      type: 'expense_admin',
+      treasuryId: cost.safeType || 'main',
+      treasuryName: cost.safeType === 'sub' ? 'الخزنة الفرعية' : 'الخزنة الرئيسية',
+      type: 'expense',
       amount: -cost.amount,
       balanceAfter: 0,
-      description: `مصروف إداري: ${cost.title}`,
-      relatedId: cost.id,
-      date: cost.paymentDate,
+      notes: `مصروف إداري: ${cost.title}`,
+      date: cost.paymentDate || cost.date || new Date().toISOString().split('T')[0],
       createdAt: Date.now(),
+      createdBy: 'system',
     });
   },
 
@@ -547,21 +652,25 @@ export const tenantStorage = {
 
     const profile: UserProfile = {
       id: `usr_${Date.now()}`,
+      ownerUid: tenantId,
+      workshopId: tenantId,
       tenantId,
       email: cleanEmail,
       brandName: params.brandName.trim(),
       artistName: params.artistName.trim(),
-      logoUrl: params.logoUrl,
       gender: params.gender,
       country: params.country,
-      callingCode: params.callingCode,
       currency: params.currency,
       currencySymbol: params.currencySymbol,
       phoneNumber: params.phoneNumber.trim(),
+      selectedCrafts: ['macrame'],
+      defaultVatPercent: 14,
+      showTaxInfoOnInvoice: false,
       accountPasswordHash: passwordHash,
       socials: {},
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      createdBy: cleanEmail,
     };
     await db.profiles.put(profile);
     await this.seedDemoDataIfEmpty(tenantId);
@@ -582,24 +691,30 @@ export const tenantStorage = {
       throw new Error('كلمة المرور غير صحيحة، يرجى التأكد من كلمة المرور وإعادة المحاولة.');
     }
 
-    let profile = await this.getProfile(authRecord.tenantId);
+    const recTenantId = authRecord.tenantId || authRecord.workshopId || authRecord.id;
+    let profile = await this.getProfile(recTenantId);
     if (!profile) {
       profile = {
         id: `usr_${Date.now()}`,
-        tenantId: authRecord.tenantId,
+        ownerUid: recTenantId,
+        workshopId: recTenantId,
+        tenantId: recTenantId,
         email: cleanEmail,
-        brandName: authRecord.brandName,
-        artistName: authRecord.artistName,
+        brandName: authRecord.brandName || 'ورشة الحرف',
+        artistName: authRecord.artistName || 'فنان المشغولات',
         gender: 'female',
         country: 'جمهورية مصر العربية',
-        callingCode: '+20',
         currency: 'EGP',
         currencySymbol: 'جنيه',
         phoneNumber: '01000000000',
+        selectedCrafts: ['macrame'],
+        defaultVatPercent: 14,
+        showTaxInfoOnInvoice: false,
         accountPasswordHash: authRecord.passwordHash,
         socials: {},
-        createdAt: authRecord.createdAt,
+        createdAt: authRecord.createdAt || Date.now(),
         updatedAt: Date.now(),
+        createdBy: cleanEmail,
       };
       await db.profiles.put(profile);
     }
@@ -663,6 +778,13 @@ export const tenantStorage = {
     await db.aiKnowledgeBase.where('tenantId').equals(tenantId).delete();
   },
 
+  // BROADCAST NOTIFICATION EVENT TO REACT APP INSTANTLY
+  broadcastNotificationsUpdated() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('alshams_notifications_changed'));
+    }
+  },
+
   // NOTIFICATIONS ENGINE
   async getNotifications(tenantId: string): Promise<NotificationItem[]> {
     return db.notifications.where('tenantId').equals(tenantId).reverse().sortBy('createdAt');
@@ -673,6 +795,7 @@ export const tenantStorage = {
     if (item) {
       item.isRead = true;
       await db.notifications.put(item);
+      this.broadcastNotificationsUpdated();
     }
   },
 
@@ -682,6 +805,7 @@ export const tenantStorage = {
       item.isRead = true;
       await db.notifications.put(item);
     }
+    this.broadcastNotificationsUpdated();
   },
 
   async updateOrderStatus(tenantId: string, orderId: string, newStatus: any): Promise<void> {
@@ -703,6 +827,7 @@ export const tenantStorage = {
         authorizedByPassword: true,
         timestamp: Date.now(),
       });
+      this.broadcastNotificationsUpdated();
     }
   },
 
@@ -712,22 +837,51 @@ export const tenantStorage = {
       const existingNotifs = await db.notifications.where('tenantId').equals(tenantId).toArray();
       const existingTitles = new Set(existingNotifs.map((n) => n.title));
 
-      // 1. Stock Depletion Alerts (تنبيهات نفاد المخزن)
+      // 1. Automatic Stock Depletion Alerts (تنبيهات تلقائية عند الوصول لحد الطلب الأدنى بالمخزن)
       const materials = await this.getRawMaterials(tenantId);
       for (const mat of materials) {
-        if (mat.currentStock <= mat.minAlertThreshold) {
-          const title = `⚠️ نفاد المخزن: خامة "${mat.materialName}"`;
-          if (!existingTitles.has(title)) {
+        const threshold = Number(mat.minAlertThreshold ?? mat.reorderLevel ?? 5);
+        const currentStock = Number(mat.currentStock) || 0;
+        const isDepleted = currentStock <= threshold;
+        const alertId = 'notif_stock_' + mat.id;
+        const existingStockAlert = existingNotifs.find(
+          (n) => n.type === 'stock_depletion' && (n.relatedItemId === mat.id || n.id === alertId)
+        );
+
+        if (isDepleted) {
+          const shortage = Number((threshold - currentStock).toFixed(2));
+          const title = `⚠️ تنبيه حد الطلب الأدنى: خامة "${mat.materialName}"`;
+          const message =
+            currentStock <= 0
+              ? `نفدت خامة "${mat.materialName}" بالكامل من المخزن (الرصيد: 0 ${mat.unit})! حد الطلب الأدنى المحدد هو (${threshold} ${mat.unit}). يرجى إصدار أمر شراء وتوريد عاجل لمنع توقف الإنتاج.`
+              : `انخفض رصيد الخامة "${mat.materialName}" إلى (${currentStock} ${mat.unit}) وهو أقل من أو يساوي حد الطلب الأدنى المحدد (${threshold} ${mat.unit}) بنقص (${shortage} ${mat.unit}). يرجى المبادرة بإصدار أمر توريد عاجل.`;
+
+          if (!existingStockAlert) {
             await db.notifications.put({
-              id: 'notif_stock_' + mat.id + '_' + Math.floor(now / (86400000 * 2)),
+              id: alertId,
               tenantId,
               type: 'stock_depletion',
               title,
-              message: `الرصيد المتبقي (${mat.currentStock} ${mat.unit}) وصل أو قل عن حد الأمان (${mat.minAlertThreshold} ${mat.unit}). يرجى إصدار أمر توريد.`,
+              message,
               isRead: false,
               relatedItemId: mat.id,
               createdAt: now,
             });
+          } else {
+            // If the stock level changed or depleted further, reactivate unread status to alert the artisan in the bell
+            const contentChanged = existingStockAlert.message !== message;
+            await db.notifications.put({
+              ...existingStockAlert,
+              title,
+              message,
+              isRead: contentChanged ? false : existingStockAlert.isRead,
+              createdAt: contentChanged ? now : existingStockAlert.createdAt,
+            });
+          }
+        } else {
+          // If stock has been replenished safely above the reorder point, auto-dismiss old depletion alert
+          if (existingStockAlert) {
+            await db.notifications.delete(existingStockAlert.id);
           }
         }
       }
@@ -804,7 +958,7 @@ export const tenantStorage = {
       }
 
       // 4. Peak Performance Milestones (أكبر نسبة مبيعات يومياً)
-      const totalPaidOrders = orders.filter((o) => o.amountPaid > 0);
+      const totalPaidOrders = orders.filter((o) => (o.amountPaid || o.paidAmount || 0) > 0);
       if (totalPaidOrders.length >= 3) {
         const title = `🏆 إنجاز ورشة: نشاط مبيعات متميز اليوم!`;
         if (!existingTitles.has(title)) {
@@ -819,6 +973,9 @@ export const tenantStorage = {
           });
         }
       }
+
+      // Broadcast update to React UI in real-time
+      this.broadcastNotificationsUpdated();
     } catch (err) {
       console.error('Notification generator error:', err);
     }
@@ -924,62 +1081,90 @@ export const tenantStorage = {
     // Seed supplier
     await db.suppliers.put({
       id: 'sup_1',
+      workshopId: tenantId,
       tenantId,
       name: 'الحاج إبراهيم الشناوي',
       companyName: 'مغزل المحلة للأقطان التصديرية',
+      phone: '01012345678',
       phoneNumber: '01012345678',
+      materialSpecialty: 'خيوط قطن فاخر',
       address: 'المحلة الكبرى - شارع الإنتاج',
-      totalPurchases: 4500,
+      totalInvoiced: 4500,
       totalPaid: 3500,
+      currentBalance: 1000,
+      totalPurchases: 4500,
       outstandingBalance: 1000,
       notes: 'مورد معتمد لخيوط القطن الفاخر درجة أولى',
       createdAt: Date.now() - 86400000 * 30,
+      updatedAt: Date.now() - 86400000 * 30,
+      createdBy: 'system',
     });
 
     // Seed HR employees
     await db.employees.put({
       id: 'emp_1',
+      workshopId: tenantId,
       tenantId,
       fullName: 'مريم الدسوقي',
-      specialty: 'حياكة مكرميات وجداريات فندقية',
+      role: 'حياكة مكرميات وجداريات فندقية',
       tier: 'خبير',
+      phone: '01123456789',
       phoneNumber: '01123456789',
+      hireDate: '2024-01-01',
       paymentType: 'piece_rate',
-      pieceRatePercentage: 100,
+      baseWage: 50,
+      currentAdvanceBalance: 0,
       isActive: true,
       totalEarned: 2400,
       totalPaid: 1800,
       currentBalance: 600,
       createdAt: Date.now() - 86400000 * 60,
+      updatedAt: Date.now() - 86400000 * 60,
+      createdBy: 'system',
     });
 
     await db.employees.put({
       id: 'emp_2',
+      workshopId: tenantId,
       tenantId,
       fullName: 'ياسمين كمال',
-      specialty: 'قص وتجهيز الخيوط والشراشيب',
+      role: 'قص وتجهيز الخيوط والشراشيب',
       tier: 'متوسط',
+      phone: '01234567890',
       phoneNumber: '01234567890',
-      paymentType: 'fixed_salary',
-      baseSalary: 3500,
+      hireDate: '2024-02-01',
+      paymentType: 'monthly',
+      baseWage: 3500,
+      currentAdvanceBalance: 0,
       isActive: true,
       totalEarned: 3500,
       totalPaid: 3500,
       currentBalance: 0,
       createdAt: Date.now() - 86400000 * 45,
+      updatedAt: Date.now() - 86400000 * 45,
+      createdBy: 'system',
     });
 
     // Seed customer
     await db.customers.put({
       id: 'cust_1',
+      workshopId: tenantId,
       tenantId,
+      name: 'مها الألفي (جاليري لمسات)',
       fullName: 'مها الألفي (جاليري لمسات)',
+      phone: '01098765432',
       phoneNumber: '01098765432',
       city: 'القاهرة - المعادي',
+      totalInvoiced: 3200,
+      totalPaid: 2800,
+      totalReturned: 0,
+      currentBalance: 400,
       totalPurchases: 3200,
       outstandingBalance: 400,
       notes: 'عميلة دائمة - ديكورات معمارية وفلل',
       createdAt: Date.now() - 86400000 * 20,
+      updatedAt: Date.now() - 86400000 * 20,
+      createdBy: 'system',
     });
   },
 };
