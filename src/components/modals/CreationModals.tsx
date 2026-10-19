@@ -341,18 +341,19 @@ export const NewSupplierModal: React.FC<{
   const [unitCost, setUnitCost] = useState(180);
   const [paidAmount, setPaidAmount] = useState(1800);
   const [safeType, setSafeType] = useState<SafeType>('main');
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
 
   React.useEffect(() => {
-    tenantStorage.getSuppliers(profile.tenantId).then((sups) => {
+    tenantStorage.getSuppliers(tenantId).then((sups) => {
       setSuppliersList(sups);
       if (sups.length > 0) setSelectedSupplierId(sups[0].id);
     });
-    tenantStorage.getRawMaterials(profile.tenantId).then((mats) => {
+    tenantStorage.getRawMaterials(tenantId).then((mats) => {
       setRawMaterialsList(mats);
       if (mats.length > 0) setSelectedMaterialId(mats[0].id);
     });
-    tenantStorage.getSupplierInvoices(profile.tenantId).then(setInvoicesList);
-  }, [profile.tenantId]);
+    tenantStorage.getSupplierInvoices(tenantId).then(setInvoicesList);
+  }, [tenantId]);
 
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -389,9 +390,9 @@ export const NewSupplierModal: React.FC<{
 
     const invoice: SupplierPurchaseInvoice = {
       id: 'sinv_' + Date.now(),
-      tenantId: profile.tenantId,
+      tenantId: profile.tenantId || profile.workshopId || profile.id || '',
       supplierId: sup.id,
-      supplierName: sup.name,
+      supplierName: sup.name || sup.companyName || 'مورد خامات',
       invoiceNumber,
       date: new Date().toISOString().split('T')[0],
       items: [

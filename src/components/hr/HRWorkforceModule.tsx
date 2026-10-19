@@ -47,10 +47,12 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
 
   const [notice, setNotice] = useState<string>('');
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadData = async () => {
     try {
-      const emps = await tenantStorage.getEmployees(profile.tenantId);
-      const payRecs = await tenantStorage.getEmployeePayouts(profile.tenantId);
+      const emps = await tenantStorage.getEmployees(tenantId);
+      const payRecs = await tenantStorage.getEmployeePayouts(tenantId);
       setEmployees(emps);
       setPayouts(payRecs);
       if (emps.length > 0 && !selectedEmployeeId) {
@@ -63,7 +65,7 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [profile.tenantId]);
+  }, [tenantId]);
 
   // Record payout or advance with automatic operating expense binding & safe deduction
   const handleRecordPayout = async (e: React.FormEvent) => {
@@ -76,7 +78,7 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
     try {
       const payoutRecord: EmployeePayoutRecord = {
         id: 'pay_' + Date.now(),
-        tenantId: profile.tenantId,
+        tenantId,
         employeeId: emp.id,
         employeeName: emp.fullName,
         type: payoutType,
@@ -100,7 +102,7 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
     }
   };
 
-  const totalPersonnelWagesSettled = payouts.reduce((sum, p) => sum + p.amount, 0);
+  const totalPersonnelWagesSettled = payouts.reduce((sum, p) => sum + (p.amount || 0), 0);
 
   const getTierBadge = (tier: EmployeeTier) => {
     switch (tier) {
@@ -187,7 +189,7 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
           <div>
             <span className="text-xs text-stone-500 block">أرصدة مستحقات الحرفيين المعلقة</span>
             <span className="text-2xl font-black font-mono text-amber-600">
-              {employees.reduce((s, e) => s + e.currentBalance, 0)} {profile.currencySymbol}
+              {employees.reduce((s, e) => s + (e.currentBalance || 0), 0)} {profile.currencySymbol}
             </span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 flex items-center justify-center">
@@ -212,10 +214,10 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <span
                     className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${getTierBadge(
-                      emp.tier
+                      emp.tier || ''
                     )}`}
                   >
-                    كادر {emp.tier}
+                    كادر {emp.tier || 'عادي'}
                   </span>
                   <span className="text-[10px] text-stone-400">
                     {emp.paymentType === 'piece_rate' ? 'مصنعية بالقطعة' : 'راتب شهري ثابت'}
@@ -226,10 +228,10 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
                   {emp.fullName}
                 </h4>
                 <p className="text-xs text-purple-700 dark:text-purple-400 font-medium mt-0.5">
-                  التخصص: {emp.specialty}
+                  التخصص: {emp.specialty || emp.role}
                 </p>
                 <p className="text-xs text-stone-500 font-mono mt-1" dir="ltr">
-                  {emp.phoneNumber}
+                  {emp.phoneNumber || emp.phone}
                 </p>
               </div>
 
@@ -237,17 +239,17 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
                 <div>
                   <span className="text-[10px] text-stone-400 block">إجمالي المستحق:</span>
                   <span className="font-bold text-stone-800 dark:text-stone-200">
-                    {emp.totalEarned} {profile.currencySymbol}
+                    {emp.totalEarned || 0} {profile.currencySymbol}
                   </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-stone-400 block">الرصيد القائم للصرف:</span>
                   <span
                     className={`font-black ${
-                      emp.currentBalance > 0 ? 'text-amber-600' : 'text-stone-400'
+                      (emp.currentBalance || 0) > 0 ? 'text-amber-600' : 'text-stone-400'
                     }`}
                   >
-                    {emp.currentBalance} {profile.currencySymbol}
+                    {emp.currentBalance || 0} {profile.currencySymbol}
                   </span>
                 </div>
               </div>

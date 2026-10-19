@@ -38,9 +38,11 @@ export const AdminExpensesModal: React.FC<AdminExpensesModalProps> = ({
   const [amount, setAmount] = useState<number>(500);
   const [notes, setNotes] = useState('');
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadData = async () => {
     try {
-      const records = await tenantStorage.getAdminCosts(profile.tenantId, selectedMonth);
+      const records = await tenantStorage.getAdminCosts(tenantId, selectedMonth);
       setExpenses(records);
     } catch (err) {
       console.error(err);
@@ -49,7 +51,7 @@ export const AdminExpensesModal: React.FC<AdminExpensesModalProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [profile.tenantId, selectedMonth]);
+  }, [tenantId, selectedMonth]);
 
   const handleAddCost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +59,7 @@ export const AdminExpensesModal: React.FC<AdminExpensesModalProps> = ({
 
     const newCost: AdminCostRecord = {
       id: 'adm_' + Date.now(),
-      tenantId: profile.tenantId,
+      tenantId,
       title: title.trim(),
       category,
       amount,
@@ -75,7 +77,7 @@ export const AdminExpensesModal: React.FC<AdminExpensesModalProps> = ({
   };
 
   const handleDelete = async (id: string) => {
-    await tenantStorage.deleteAdminCost(profile.tenantId, id);
+    await tenantStorage.deleteAdminCost(tenantId, id);
     loadData();
   };
 

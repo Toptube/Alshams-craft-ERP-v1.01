@@ -220,7 +220,9 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
 
     try {
       // Gather local knowledge base overrides for learning
-      const localOverrides = await tenantStorage.getArtisanOverrides(profile.tenantId);
+      const localOverrides = await tenantStorage.getArtisanOverrides(
+        profile.tenantId || profile.workshopId || profile.id || ''
+      );
 
       const res = await fetch('/api/chat-agent', {
         method: 'POST',
@@ -273,12 +275,15 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
   // Transfer notes to calculator
   const handleTransferToNotes = () => {
     if (!visionAnalysis) return;
-    const combinedNotes = `• التصنيف المعتمد: ${visionAnalysis.detectedCategory}
-• الساعات المقدرة: ${visionAnalysis.estimatedHours} ساعة
-• دراسة السوق: (أدنى: ${visionAnalysis.competitionPricing.minMarketPrice} | متوسط: ${visionAnalysis.competitionPricing.avgMarketPrice} | أعلى: ${visionAnalysis.competitionPricing.maxMarketPrice} ${profile.currencySymbol})
-• التوجيه الهندسي: ${visionAnalysis.notesForCalculator}
+    const minP = visionAnalysis.competitionPricing?.minMarketPrice || 0;
+    const avgP = visionAnalysis.competitionPricing?.avgMarketPrice || visionAnalysis.competitionPricing?.recommendedFairPrice || 0;
+    const maxP = visionAnalysis.competitionPricing?.maxMarketPrice || 0;
+    const combinedNotes = `• التصنيف المعتمد: ${visionAnalysis.detectedCategory || ''}
+• الساعات المقدرة: ${visionAnalysis.estimatedHours || 0} ساعة
+• دراسة السوق: (أدنى: ${minP} | متوسط: ${avgP} | أعلى: ${maxP} ${profile.currencySymbol})
+• التوجيه الهندسي: ${visionAnalysis.notesForCalculator || ''}
 • خطوات التنفيذ المختارة:
-${visionAnalysis.productionGuide.join('\n')}`;
+${(visionAnalysis.productionGuide || []).join('\n')}`;
 
     onTransferNotesToCalculator(combinedNotes);
     setTransferredNotice(true);
@@ -414,7 +419,7 @@ ${visionAnalysis.productionGuide.join('\n')}`;
                 <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800">
                   <span className="text-[10px] text-stone-500 block">أقل سعر في السوق</span>
                   <span className="font-mono font-bold text-sm text-stone-700 dark:text-stone-300">
-                    {visionAnalysis.competitionPricing.minMarketPrice} {profile.currencySymbol}
+                    {visionAnalysis.competitionPricing?.minMarketPrice || 0} {profile.currencySymbol}
                   </span>
                 </div>
                 <div className="p-2 rounded-xl bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300/40">
@@ -422,13 +427,13 @@ ${visionAnalysis.productionGuide.join('\n')}`;
                     السعر المتوسط الشائع
                   </span>
                   <span className="font-mono font-black text-sm text-amber-800 dark:text-amber-200">
-                    {visionAnalysis.competitionPricing.avgMarketPrice} {profile.currencySymbol}
+                    {visionAnalysis.competitionPricing?.avgMarketPrice || visionAnalysis.competitionPricing?.recommendedFairPrice || 0} {profile.currencySymbol}
                   </span>
                 </div>
                 <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800">
                   <span className="text-[10px] text-stone-500 block">أعلى سعر قطاعي فاخر</span>
                   <span className="font-mono font-bold text-sm text-stone-700 dark:text-stone-300">
-                    {visionAnalysis.competitionPricing.maxMarketPrice} {profile.currencySymbol}
+                    {visionAnalysis.competitionPricing?.maxMarketPrice || 0} {profile.currencySymbol}
                   </span>
                 </div>
               </div>
@@ -443,7 +448,7 @@ ${visionAnalysis.productionGuide.join('\n')}`;
                   <span>كتالوج العقد والغرز المستخدمة:</span>
                 </div>
                 <ul className="space-y-1 text-xs text-stone-600 dark:text-stone-300 list-disc list-inside">
-                  {visionAnalysis.stitchPatterns.map((pat, idx) => (
+                  {visionAnalysis.stitchPatterns.map((pat: string, idx: number) => (
                     <li key={idx} className="leading-relaxed">
                       {pat}
                     </li>
@@ -458,7 +463,7 @@ ${visionAnalysis.productionGuide.join('\n')}`;
                   <span>خطوات طريقة العمل المنظمة:</span>
                 </div>
                 <ol className="space-y-1 text-xs text-stone-600 dark:text-stone-300 list-decimal list-inside">
-                  {visionAnalysis.productionGuide.map((step, idx) => (
+                  {visionAnalysis.productionGuide.map((step: string, idx: number) => (
                     <li key={idx} className="leading-relaxed">
                       {step}
                     </li>

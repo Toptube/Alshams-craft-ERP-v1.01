@@ -49,10 +49,12 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustCity, setNewCustCity] = useState('القاهرة');
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadData = async () => {
     try {
-      const custs = await tenantStorage.getCustomers(profile.tenantId);
-      const ords = await tenantStorage.getOrders(profile.tenantId);
+      const custs = await tenantStorage.getCustomers(tenantId);
+      const ords = await tenantStorage.getOrders(tenantId);
       setCustomers(custs);
       setOrders(ords);
       if (custs.length > 0 && !selectedCustomerId) {
@@ -65,7 +67,7 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [profile.tenantId]);
+  }, [tenantId]);
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +75,7 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
 
     const newCust: CustomerProfile = {
       id: 'cust_' + Date.now(),
-      tenantId: profile.tenantId,
+      tenantId,
       fullName: newCustName.trim(),
       phoneNumber: newCustPhone.trim() || '01000000000',
       city: newCustCity.trim(),
@@ -103,7 +105,7 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
 
     const newOrder: CustomerOrder = {
       id: 'ord_' + Date.now(),
-      tenantId: profile.tenantId,
+      tenantId,
       customerId: customer.id,
       customerName: customer.fullName,
       customerPhone: customer.phoneNumber,
@@ -323,7 +325,7 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
                               {o.amountPaid} {profile.currencySymbol}
                             </td>
                             <td className="p-2.5 font-mono text-rose-600 font-bold">
-                              {o.remainingAmount > 0 ? `${o.remainingAmount} ${profile.currencySymbol}` : 'خالص'}
+                              {(o.remainingAmount ?? 0) > 0 ? `${o.remainingAmount} ${profile.currencySymbol}` : 'خالص'}
                             </td>
                             <td className="p-2.5">
                               <span
@@ -395,12 +397,12 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
                           <span className="text-[10px] text-stone-400 block">المتبقي:</span>
                           <span
                             className={
-                              c.outstandingBalance > 0
+                              (c.outstandingBalance || 0) > 0
                                 ? 'text-rose-600 font-bold'
                                 : 'text-emerald-600'
                             }
                           >
-                            {c.outstandingBalance} {profile.currencySymbol}
+                            {c.outstandingBalance || 0} {profile.currencySymbol}
                           </span>
                         </div>
                       </div>

@@ -279,7 +279,7 @@ export const firestoreService = {
     const colRef = getColRef(workshopId, 'expenses');
     const snap = await getDocs(colRef);
     const list = snap.docs.map((d) => d.data() as ExpenseItem);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async recordExpense(workshopId: string, expense: ExpenseItem): Promise<void> {
@@ -307,17 +307,17 @@ export const firestoreService = {
       const tx: TreasuryTransaction = {
         id: txId,
         workshopId,
-        treasuryId: expense.treasuryId,
+        treasuryId: expense.treasuryId || 'main',
         treasuryName: trData.name,
         type: 'expense',
         amount: expense.amount,
         balanceAfter: newBal,
         referenceType: 'expense',
         referenceId: expense.id,
-        notes: `${expense.categoryNameAr}: ${expense.title}`,
-        date: expense.date,
+        notes: `${expense.categoryNameAr || 'مصروف'}: ${expense.title}`,
+        date: expense.date || new Date().toISOString().split('T')[0],
         createdAt: Date.now(),
-        createdBy: expense.createdBy,
+        createdBy: expense.createdBy || 'artisan',
       };
       t.set(getDocRef(workshopId, 'treasuryTransactions', txId), tx);
     });
@@ -327,7 +327,7 @@ export const firestoreService = {
     const colRef = getColRef(workshopId, 'revenues');
     const snap = await getDocs(colRef);
     const list = snap.docs.map((d) => d.data() as RevenueItem);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async recordRevenue(workshopId: string, revenue: RevenueItem): Promise<void> {
@@ -419,11 +419,11 @@ export const firestoreService = {
         // Adjust customer invoiced totals
         const oldInvoiceTotal = invSnap.exists() ? (invSnap.data() as InvoiceRecord).totalAmount : 0;
         const diff = invoice.totalAmount - oldInvoiceTotal;
-        const newTotalInvoiced = Math.max(0, custData.totalInvoiced + diff);
+        const newTotalInvoiced = Math.max(0, (custData.totalInvoiced || 0) + diff);
         const balRes = calculateCustomerBalance(
           newTotalInvoiced,
-          custData.totalPaid,
-          custData.totalReturned
+          custData.totalPaid || 0,
+          custData.totalReturned || 0
         );
 
         t.update(custRef, {
@@ -502,11 +502,11 @@ export const firestoreService = {
       const custSnap = await t.get(custRef);
       if (custSnap.exists()) {
         const custData = custSnap.data() as CustomerRecord;
-        const updatedTotalPaid = custData.totalPaid + payment.amount;
+        const updatedTotalPaid = (custData.totalPaid || 0) + payment.amount;
         const balRes = calculateCustomerBalance(
-          custData.totalInvoiced,
+          custData.totalInvoiced || 0,
           updatedTotalPaid,
-          custData.totalReturned
+          custData.totalReturned || 0
         );
         t.update(custRef, {
           totalPaid: updatedTotalPaid,
@@ -623,10 +623,10 @@ export const firestoreService = {
       const custSnap = await t.get(custRef);
       if (custSnap.exists()) {
         const custData = custSnap.data() as CustomerRecord;
-        const newTotalReturned = custData.totalReturned + returnRecord.totalAmount;
+        const newTotalReturned = (custData.totalReturned || 0) + returnRecord.totalAmount;
         const balRes = calculateCustomerBalance(
-          custData.totalInvoiced,
-          custData.totalPaid,
+          custData.totalInvoiced || 0,
+          custData.totalPaid || 0,
           newTotalReturned
         );
         t.update(custRef, {
@@ -753,8 +753,8 @@ export const firestoreService = {
         const oldTotal = invSnap.exists()
           ? (invSnap.data() as SupplierInvoiceRecord).totalAmount
           : 0;
-        const newTotalInvoiced = suppData.totalInvoiced + (invoice.totalAmount - oldTotal);
-        const balRes = calculateSupplierBalance(newTotalInvoiced, suppData.totalPaid);
+        const newTotalInvoiced = (suppData.totalInvoiced || 0) + (invoice.totalAmount - oldTotal);
+        const balRes = calculateSupplierBalance(newTotalInvoiced, suppData.totalPaid || 0);
 
         t.update(suppRef, {
           totalInvoiced: newTotalInvoiced,
@@ -831,8 +831,8 @@ export const firestoreService = {
       const suppSnap = await t.get(suppRef);
       if (suppSnap.exists()) {
         const suppData = suppSnap.data() as SupplierRecord;
-        const newTotalPaid = suppData.totalPaid + payment.amount;
-        const balRes = calculateSupplierBalance(suppData.totalInvoiced, newTotalPaid);
+        const newTotalPaid = (suppData.totalPaid || 0) + payment.amount;
+        const balRes = calculateSupplierBalance(suppData.totalInvoiced || 0, newTotalPaid);
         t.update(suppRef, {
           totalPaid: newTotalPaid,
           currentBalance: balRes.rawBalance,
@@ -879,7 +879,7 @@ export const firestoreService = {
     }
     const snap = await getDocs(q);
     const list = snap.docs.map((d) => d.data() as StockMovementRecord);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async recordStockAudit(
@@ -1246,7 +1246,7 @@ export const firestoreService = {
       t.update(trRef, { balance: newTrBal, updatedAt: Date.now() });
 
       // Increase employee advance balance
-      const newAdvBal = empData.currentAdvanceBalance + advance.amount;
+      const newAdvBal = (empData.currentAdvanceBalance || 0) + advance.amount;
       t.update(empRef, { currentAdvanceBalance: newAdvBal, updatedAt: Date.now() });
 
       // Set advance
@@ -1280,7 +1280,7 @@ export const firestoreService = {
       : colRef;
     const snap = await getDocs(q);
     const list = snap.docs.map((d) => d.data() as PayrollRecord);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async savePayroll(workshopId: string, payroll: PayrollRecord): Promise<void> {
@@ -1324,8 +1324,8 @@ export const firestoreService = {
         ...(payData.payouts || []),
         { ...payout, treasuryName: trData.name },
       ];
-      const newPaid = updatedPayouts.reduce((sum, p) => sum + p.amount, 0);
-      const statusRes = determineSalaryPayoutStatus(payData.netSalary, newPaid);
+      const newPaid = updatedPayouts.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const statusRes = determineSalaryPayoutStatus(payData.netSalary || 0, newPaid);
 
       t.update(payRef, {
         payouts: updatedPayouts,
@@ -1396,7 +1396,7 @@ export const firestoreService = {
     const payCol = getColRef(workshopId, 'payrolls');
     const paySnap = await getDocs(query(payCol, where('monthYear', '==', monthYear)));
     const monthPayrolls = paySnap.docs.map((d) => d.data() as PayrollRecord);
-    const wagesTotal = monthPayrolls.reduce((sum, p) => sum + p.netSalary, 0);
+    const wagesTotal = monthPayrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
 
     // COGS estimate: 45% of sales or from work orders
     const cogsTotal = Math.round(salesTotal * 0.42);

@@ -32,11 +32,13 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadRecords = async () => {
     setLoading(true);
     try {
       const items = await tenantStorage.getProducts(
-        profile.tenantId,
+        tenantId,
         selectedCategoryFilter,
         searchQuery
       );
@@ -50,12 +52,12 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
 
   useEffect(() => {
     loadRecords();
-  }, [profile.tenantId, selectedCategoryFilter, searchQuery]);
+  }, [tenantId, selectedCategoryFilter, searchQuery]);
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('هل أنت متأكد من حذف بطاقة التصميم هذه من الأرشيف؟')) {
-      await tenantStorage.deleteProduct(profile.tenantId, id);
+      await tenantStorage.deleteProduct(tenantId, id);
       loadRecords();
     }
   };

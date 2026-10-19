@@ -66,14 +66,18 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
     // 1. Customers
     cache.customers.forEach((c) => {
-      if (c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.city?.toLowerCase().includes(q)) {
+      const cName = c.name || c.fullName || '';
+      const cPhone = c.phone || c.phoneNumber || '';
+      const cCity = c.city || '';
+      const balance = c.currentBalance ?? c.outstandingBalance ?? 0;
+      if (cName.toLowerCase().includes(q) || cPhone.includes(q) || cCity.toLowerCase().includes(q)) {
         results.push({
           categoryKey: 'customers',
           categoryName: 'العملاء',
           icon: User,
           id: c.id,
-          title: c.name,
-          subtitle: `هاتف: ${c.phone} • الرصيد: ${c.currentBalance > 0 ? `عليه ${c.currentBalance}` : c.currentBalance < 0 ? `له ${Math.abs(c.currentBalance)}` : 'خالص'}`,
+          title: cName || 'عميل',
+          subtitle: `هاتف: ${cPhone} • الرصيد: ${balance > 0 ? `عليه ${balance}` : balance < 0 ? `له ${Math.abs(balance)}` : 'خالص'}`,
           badge: 'عميل',
           rawItem: c,
         });
@@ -82,9 +86,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
     // 2. Suppliers
     cache.suppliers.forEach((s) => {
+      const sName = s.name || s.companyName || '';
+      const sPhone = s.phone || s.phoneNumber || '';
       const match =
-        (s.name && s.name.toLowerCase().includes(q)) ||
-        (s.phone && s.phone.includes(q)) ||
+        (sName && sName.toLowerCase().includes(q)) ||
+        (sPhone && sPhone.includes(q)) ||
         (s.materialSpecialty && s.materialSpecialty.toLowerCase().includes(q));
       if (match) {
         results.push({
@@ -92,8 +98,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           categoryName: 'الموردون',
           icon: Truck,
           id: s.id,
-          title: s.name,
-          subtitle: `تخصص: ${s.materialSpecialty || 'عام'} • هاتف: ${s.phone}`,
+          title: sName || 'مورد',
+          subtitle: `تخصص: ${s.materialSpecialty || 'عام'} • هاتف: ${sPhone}`,
           badge: 'مورد',
           rawItem: s,
         });
@@ -169,14 +175,17 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
     // 6. Employees
     cache.employees.forEach((emp) => {
-      if (emp.fullName.toLowerCase().includes(q) || emp.phone.includes(q) || emp.role.toLowerCase().includes(q)) {
+      const eName = emp.fullName || '';
+      const ePhone = emp.phone || emp.phoneNumber || '';
+      const eRole = emp.role || emp.specialty || '';
+      if (eName.toLowerCase().includes(q) || ePhone.includes(q) || eRole.toLowerCase().includes(q)) {
         results.push({
           categoryKey: 'employees',
           categoryName: 'فريق العمل',
           icon: Users,
           id: emp.id,
-          title: emp.fullName,
-          subtitle: `الدور: ${emp.role} • الراتب الأساسي: ${emp.baseWage} ج.م`,
+          title: eName || 'موظف',
+          subtitle: `الدور: ${eRole || 'حرفي'} • الراتب الأساسي: ${emp.baseWage || 0} ج.م`,
           badge: 'موظف',
           rawItem: emp,
         });

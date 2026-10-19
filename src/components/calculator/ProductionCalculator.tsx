@@ -69,7 +69,7 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
 
   // 1. Workflow sequence: Category FIRST strictly
   const [category, setCategory] = useState<CraftCategory>(
-    initialRecord?.category || 'جدارية'
+    (initialRecord?.category as CraftCategory) || 'جدارية'
   );
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
@@ -210,8 +210,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
   // Load database raw materials & employees for dynamic feeding
   const loadDatabaseMaterialsAndStaff = async () => {
     try {
-      const mats = await tenantStorage.getRawMaterials(profile.tenantId);
-      const emps = await tenantStorage.getEmployees(profile.tenantId);
+      const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+      const mats = await tenantStorage.getRawMaterials(tenantId);
+      const emps = await tenantStorage.getEmployees(tenantId);
       setDbMaterials(mats);
       setDbEmployees(emps);
 
@@ -461,7 +462,7 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
       if (calculationInput.manualOverrideStrands) {
         await tenantStorage.logArtisanOverride({
           id: 'ai_kn_' + Math.random().toString(36).substring(2, 9),
-          tenantId: profile.tenantId,
+          tenantId: profile.tenantId || profile.workshopId || profile.id || '',
           category,
           overrideField: 'عدد الفتلات الأساسية',
           initialValue: output.baseStrandsCount,

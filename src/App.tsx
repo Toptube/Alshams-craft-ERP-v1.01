@@ -11,6 +11,14 @@ import { HRWorkforceModule } from './components/hr/HRWorkforceModule';
 import { FalconAIAgent } from './components/ai/FalconAIAgent';
 import { ProductArchive } from './components/archive/ProductArchive';
 import { SaaSReportsAnalyticsView } from './components/reports/SaaSReportsAnalyticsView';
+import { TreasuriesView } from './components/treasuries/TreasuriesView';
+import { InvoicesView } from './components/invoices/InvoicesView';
+import { SuppliersView } from './components/suppliers/SuppliersView';
+import { WorkOrdersView } from './components/workOrders/WorkOrdersView';
+import { CraftsSelectorModal } from './components/onboarding/CraftsSelectorModal';
+import { GlobalSearchModal, GlobalSearchDataCache } from './components/search/GlobalSearchModal';
+import { UserGuideModal } from './components/guide/UserGuideModal';
+import { CloudMigrationModal } from './components/migration/CloudMigrationModal';
 import { ProfileSettingsModal } from './components/profile/ProfileSettingsModal';
 import { InventoryLedgerModal } from './components/inventory/InventoryLedgerModal';
 import { AdminExpensesModal } from './components/adminCosts/AdminExpensesModal';
@@ -22,6 +30,7 @@ import {
   NewEmployeeModal,
 } from './components/modals/CreationModals';
 import { tenantStorage } from './db/dexieDB';
+import { firestoreService } from './db/firestoreService';
 import {
   PlusCircle,
   Calculator,
@@ -32,7 +41,24 @@ import {
   BarChart3,
   Boxes,
   Building,
+  Wallet,
+  Hammer,
+  Truck,
+  FileText,
 } from 'lucide-react';
+
+export type AppActiveView =
+  | 'create_center'
+  | 'calculator'
+  | 'sales'
+  | 'invoices'
+  | 'work_orders'
+  | 'suppliers'
+  | 'treasuries'
+  | 'hr'
+  | 'ai_agent'
+  | 'archive'
+  | 'reports';
 
 export default function App() {
   // Authentication State
@@ -48,13 +74,27 @@ export default function App() {
   });
 
   // Active View State:
-  // 'create_center' | 'calculator' | 'sales' | 'hr' | 'ai_agent' | 'archive' | 'reports'
-  const [activeView, setActiveView] = useState<
-    'create_center' | 'calculator' | 'sales' | 'hr' | 'ai_agent' | 'archive' | 'reports'
-  >('create_center');
+  const [activeView, setActiveView] = useState<AppActiveView>('create_center');
 
   // Mobile Drawer State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Modals for Crafts, Search, Guide, Cloud Migration
+  const [isCraftsSelectorOpen, setIsCraftsSelectorOpen] = useState(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
+  const [userGuideSection, setUserGuideSection] = useState<string | undefined>(undefined);
+  const [isCloudMigrationOpen, setIsCloudMigrationOpen] = useState(false);
+
+  const [searchCache, setSearchCache] = useState<GlobalSearchDataCache>({
+    customers: [],
+    suppliers: [],
+    products: [],
+    materials: [],
+    invoices: [],
+    workOrders: [],
+    employees: [],
+  });
 
   // Creation Modals States (from Create Center & shortcuts)
   const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
@@ -85,11 +125,39 @@ export default function App() {
   const loadNotifications = useCallback(async () => {
     if (!currentProfile) return;
     try {
-      await tenantStorage.generateProactiveNotifications(currentProfile.tenantId);
-      const notifs = await tenantStorage.getNotifications(currentProfile.tenantId);
+      const tid = currentProfile.tenantId || currentProfile.workshopId || currentProfile.id || '';
+      await tenantStorage.generateProactiveNotifications(tid);
+      const notifs = await tenantStorage.getNotifications(tid);
       setNotifications(notifs);
     } catch (err) {
       console.error('Failed to load notifications:', err);
+    }
+  }, [currentProfile]);
+
+  const loadSearchCache = useCallback(async () => {
+    if (!currentProfile) return;
+    try {
+      const tenantId = currentProfile.tenantId || currentProfile.workshopId || currentProfile.id || '';
+      const [customers, suppliers, products, materials, invoices, workOrders, employees] = await Promise.all([
+        tenantStorage.getCustomers(tenantId).catch(() => []),
+        tenantStorage.getSuppliers(tenantId).catch(() => []),
+        firestoreService.getFinishedProducts(tenantId).catch(() => []),
+        tenantStorage.getRawMaterials(tenantId).catch(() => []),
+        tenantStorage.getOrders(tenantId).catch(() => []),
+        firestoreService.getWorkOrders(tenantId).catch(() => []),
+        tenantStorage.getEmployees(tenantId).catch(() => []),
+      ]);
+      setSearchCache({
+        customers,
+        suppliers,
+        products,
+        materials,
+        invoices: invoices as any,
+        workOrders,
+        employees,
+      });
+    } catch (err) {
+      console.error('Error loading search cache:', err);
     }
   }, [currentProfile]);
 
@@ -132,6 +200,9 @@ export default function App() {
         .then((profile) => {
           if (profile) {
             setCurrentProfile(profile);
+            if (!localStorage.getItem('alshams_crafts_selected')) {
+              setIsCraftsSelectorOpen(true);
+            }
           }
         })
         .finally(() => {
@@ -145,8 +216,13 @@ export default function App() {
 
   const handleAuthenticated = (profile: UserProfile) => {
     setCurrentProfile(profile);
-    localStorage.setItem('alshams_active_tenant_id', profile.tenantId);
+    const tid = profile.tenantId || profile.workshopId || profile.id || '';
+    localStorage.setItem('alshams_active_tenant_id', tid);
     sessionStorage.setItem('alshams_session_verified', 'true');
+    // Rule 5: بعد الدخول لأول مرة، يظهر مكوّن اختيار الأقسام CraftsSelectorModal مرة واحدة ثم يُحفظ الاختيار
+    if (!localStorage.getItem('alshams_crafts_selected')) {
+      setIsCraftsSelectorOpen(true);
+    }
   };
 
   const handleLogout = () => {
@@ -215,15 +291,11 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         profile={currentProfile}
-        activeView={activeView}
-        onSelectView={setActiveView}
-        unreadNotificationsCount={notifications.filter((n) => !n.isRead).length}
-        onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
-        onOpenProfileSettings={() => setIsProfileModalOpen(true)}
-        onToggleDarkMode={toggleDarkMode}
-        isDarkMode={isDarkMode}
-        onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
-        onLogout={handleLogout}
+        onToggleSidebar={() => setIsMobileMenuOpen(true)}
+        onOpenGlobalSearch={() => {
+          loadSearchCache();
+          setIsGlobalSearchOpen(true);
+        }}
       />
 
       {/* Mobile Lateral Hamburger Drawer */}
@@ -232,10 +304,24 @@ export default function App() {
         onClose={() => setIsMobileMenuOpen(false)}
         profile={currentProfile}
         activeView={activeView}
-        onSelectView={setActiveView}
+        onSelectView={(v) => {
+          if (v === 'inventory') {
+            setIsInventoryModalOpen(true);
+          } else if (v === 'expenses') {
+            setIsAdminCostsModalOpen(true);
+          } else {
+            setActiveView(v as AppActiveView);
+          }
+        }}
+        unreadNotificationsCount={notifications.filter((n) => !n.isRead).length}
+        onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
         onOpenProfileSettings={() => setIsProfileModalOpen(true)}
-        onOpenInventory={() => setIsInventoryModalOpen(true)}
-        onOpenAdminCosts={() => setIsAdminCostsModalOpen(true)}
+        onOpenCraftsSelector={() => setIsCraftsSelectorOpen(true)}
+        onOpenUserGuide={(sectionId) => {
+          setUserGuideSection(sectionId);
+          setIsUserGuideOpen(true);
+        }}
+        onOpenCloudMigration={() => setIsCloudMigrationOpen(true)}
         onToggleDarkMode={toggleDarkMode}
         isDarkMode={isDarkMode}
         onLogout={handleLogout}
@@ -271,10 +357,24 @@ export default function App() {
               }`}
             >
               <Calculator className="w-3.5 h-3.5" />
-              <span>حاسبة تكاليف المنتج</span>
+              <span>حاسبة التكاليف</span>
             </button>
 
-            {/* 3. المبيعات */}
+            {/* 3. فواتير المبيعات */}
+            <button
+              type="button"
+              onClick={() => setActiveView('invoices')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'invoices'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>فواتير المبيعات</span>
+            </button>
+
+            {/* 4. طلبيات العملاء */}
             <button
               type="button"
               onClick={() => setActiveView('sales')}
@@ -285,10 +385,52 @@ export default function App() {
               }`}
             >
               <ShoppingCart className="w-3.5 h-3.5" />
-              <span>المبيعات والطلبيات</span>
+              <span>طلبيات العملاء</span>
             </button>
 
-            {/* 4. كادر العمالة HR */}
+            {/* 5. أوامر التشغيل */}
+            <button
+              type="button"
+              onClick={() => setActiveView('work_orders')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'work_orders'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <Hammer className="w-3.5 h-3.5" />
+              <span>أوامر التشغيل</span>
+            </button>
+
+            {/* 6. الموردون */}
+            <button
+              type="button"
+              onClick={() => setActiveView('suppliers')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'suppliers'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>الموردون</span>
+            </button>
+
+            {/* 7. الخزن والسيولة */}
+            <button
+              type="button"
+              onClick={() => setActiveView('treasuries')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'treasuries'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              <span>الخزن والسيولة</span>
+            </button>
+
+            {/* 8. كادر العمالة HR */}
             <button
               type="button"
               onClick={() => setActiveView('hr')}
@@ -302,7 +444,7 @@ export default function App() {
               <span>كادر العمالة HR</span>
             </button>
 
-            {/* 5. صقر الشمساوية AI */}
+            {/* 9. صقر الشمساوية AI */}
             <button
               type="button"
               onClick={() => setActiveView('ai_agent')}
@@ -316,7 +458,7 @@ export default function App() {
               <span>صقر الشمساوية AI</span>
             </button>
 
-            {/* 6. الأرشيف */}
+            {/* 10. الأرشيف */}
             <button
               type="button"
               onClick={() => setActiveView('archive')}
@@ -330,7 +472,7 @@ export default function App() {
               <span>الأرشيف</span>
             </button>
 
-            {/* 7. التقارير */}
+            {/* 11. التقارير */}
             <button
               type="button"
               onClick={() => setActiveView('reports')}
@@ -352,7 +494,7 @@ export default function App() {
               className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 dark:bg-stone-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-stone-700 dark:text-stone-300 border flex items-center gap-1.5 transition cursor-pointer"
             >
               <Boxes className="w-3.5 h-3.5 text-amber-600" />
-              <span>المخازن والموردين</span>
+              <span>المخازن وكارت الصنف</span>
             </button>
           </div>
         </div>
@@ -383,6 +525,48 @@ export default function App() {
           />
         )}
 
+        {activeView === 'invoices' && (
+          <InvoicesView
+            workshop={currentProfile}
+            onOpenHelp={(sec) => {
+              setUserGuideSection(sec);
+              setIsUserGuideOpen(true);
+            }}
+            onOpenDocumentPreview={() => {}}
+          />
+        )}
+
+        {activeView === 'work_orders' && (
+          <WorkOrdersView
+            workshop={currentProfile}
+            onOpenHelp={(sec) => {
+              setUserGuideSection(sec);
+              setIsUserGuideOpen(true);
+            }}
+          />
+        )}
+
+        {activeView === 'suppliers' && (
+          <SuppliersView
+            workshop={currentProfile}
+            onOpenHelp={(sec) => {
+              setUserGuideSection(sec);
+              setIsUserGuideOpen(true);
+            }}
+            onOpenDocumentPreview={() => {}}
+          />
+        )}
+
+        {activeView === 'treasuries' && (
+          <TreasuriesView
+            workshop={currentProfile}
+            onOpenHelp={(sec) => {
+              setUserGuideSection(sec);
+              setIsUserGuideOpen(true);
+            }}
+          />
+        )}
+
         {activeView === 'sales' && (
           <SalesOrdersView
             profile={currentProfile}
@@ -401,7 +585,7 @@ export default function App() {
         {activeView === 'ai_agent' && (
           <FalconAIAgent
             profile={currentProfile}
-            currentCategory={reloadedRecord?.category || 'جدارية'}
+            currentCategory={(reloadedRecord?.category as CraftCategory) || 'جدارية'}
             onApplyCategoryFromAI={handleApplyCategoryFromAI}
             onApplyEstimatedLaborWage={handleApplyEstimatedLaborWage}
             onTransferNotesToCalculator={handleTransferNotesToCalculator}
@@ -493,6 +677,52 @@ export default function App() {
         onClose={() => setIsQuoteDrawerOpen(false)}
         record={quoteRecord}
         profile={currentProfile}
+      />
+
+      {/* Crafts Selector Modal (اختيار أقسام الورشة) */}
+      <CraftsSelectorModal
+        isOpen={isCraftsSelectorOpen}
+        onClose={() => setIsCraftsSelectorOpen(false)}
+        workshop={currentProfile}
+        onCraftsUpdated={(crafts) => {
+          localStorage.setItem('alshams_crafts_selected', JSON.stringify(crafts));
+          setCurrentProfile((prev) => (prev ? { ...prev, selectedCrafts: crafts } : prev));
+          setIsCraftsSelectorOpen(false);
+        }}
+      />
+
+      {/* Global Search Modal (البحث الموحد) */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        cache={searchCache}
+        onSelectResult={(cat) => {
+          setIsGlobalSearchOpen(false);
+          if (cat === 'customers' || cat === 'invoices') setActiveView('invoices');
+          else if (cat === 'suppliers') setActiveView('suppliers');
+          else if (cat === 'workOrders') setActiveView('work_orders');
+          else if (cat === 'employees') setActiveView('hr');
+          else if (cat === 'products') setActiveView('archive');
+          else if (cat === 'materials') setIsInventoryModalOpen(true);
+        }}
+      />
+
+      {/* User Guide Modal (دليل الاستخدام الشامل) */}
+      <UserGuideModal
+        isOpen={isUserGuideOpen}
+        onClose={() => setIsUserGuideOpen(false)}
+        initialSectionId={userGuideSection}
+      />
+
+      {/* Cloud Migration Modal (الترحيل السحابي) */}
+      <CloudMigrationModal
+        isOpen={isCloudMigrationOpen}
+        onClose={() => setIsCloudMigrationOpen(false)}
+        workshopId={currentProfile.ownerUid || currentProfile.workshopId || currentProfile.id}
+        userEmail={currentProfile.email}
+        onMigrationComplete={() => {
+          loadNotifications();
+        }}
       />
 
       {/* Footer Attribution Watermark */}

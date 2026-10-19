@@ -21,8 +21,8 @@ export type Shape3DType =
 
 export type EmployeePaymentType = 'monthly' | 'daily' | 'piece_rate' | 'fixed_salary';
 export type EmployeeTier = 'مبتدئ' | 'متوسط' | 'خبير' | string;
-export type PaymentMethod = 'cash' | 'instapay' | 'wallet' | 'bank';
-export type TreasuryType = 'cash' | 'instapay' | 'wallet' | 'bank';
+export type PaymentMethod = 'cash' | 'instapay' | 'wallet' | 'bank' | string;
+export type TreasuryType = 'cash' | 'instapay' | 'wallet' | 'bank' | 'main' | string;
 export type InvoiceStatus =
   | 'unpaid'
   | 'partially_paid'
@@ -141,7 +141,7 @@ export interface ExpenseItem {
   month?: string;
   paymentDate?: string;
   category: 'admin_costs' | 'transport' | 'marketing' | 'maintenance' | 'other' | string;
-  categoryNameAr: string;
+  categoryNameAr?: string;
   title: string;
   amount: number;
   treasuryId?: string;
@@ -153,11 +153,11 @@ export interface ExpenseItem {
     officeFees: number;
   };
   periodId?: string;
-  notes: string;
-  date: string;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
+  notes?: string;
+  date?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
 }
 
 export interface RevenueItem {
@@ -186,7 +186,7 @@ export interface CustomerRecord {
   fullName?: string;
   phone?: string;
   phoneNumber?: string;
-  city: string;
+  city?: string;
   address?: string;
   totalInvoiced?: number;
   totalPaid?: number;
@@ -201,13 +201,13 @@ export interface CustomerRecord {
 }
 
 export interface InvoiceLineItem {
-  id: string;
+  id?: string;
   productId?: string;
   productName: string;
   category?: string;
   craftId?: string;
   quantity: number;
-  unit: string;
+  unit?: string;
   unitPrice: number;
   totalPrice: number;
   unitCostCalculated?: number;
@@ -251,20 +251,20 @@ export interface InvoiceRecord {
   customerName?: string;
   customerPhone?: string;
   productName?: string;
-  items: InvoiceLineItem[];
-  subtotal: number;
-  discount: number;
-  shipping: number;
-  vatEnabled: boolean;
-  vatPercent: number; // 14%
-  vatAmount: number;
-  returnsTotal: number;
-  totalAmount: number;
+  items?: InvoiceLineItem[];
+  subtotal?: number;
+  discount?: number;
+  shipping?: number;
+  vatEnabled?: boolean;
+  vatPercent?: number; // 14%
+  vatAmount?: number;
+  returnsTotal?: number;
+  totalAmount?: number;
   finalTotal?: number;
-  paidAmount: number;
+  paidAmount?: number;
   amountPaid?: number;
-  remainingAmount: number;
-  status: InvoiceStatus;
+  remainingAmount?: number;
+  status?: InvoiceStatus;
   deliveryDate?: string;
   depositPhases?: any;
   assignedEmployeeId?: string;
@@ -272,17 +272,19 @@ export interface InvoiceRecord {
   assignedEmployeeWage?: number;
   safeType?: string;
   price?: number;
+  totalItemsPrice?: number;
   shippingCost?: number;
   paymentStatus?: string;
-  payments: InvoicePaymentRecord[];
-  returns: InvoiceReturnRecord[];
+  paymentMethod?: PaymentMethod | string;
+  payments?: InvoicePaymentRecord[];
+  returns?: InvoiceReturnRecord[];
   periodId?: string;
   isLocked?: boolean;
   notes?: string;
-  date: string;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
+  date?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
 }
 
 // 5. Suppliers & Supplier Invoices
@@ -290,7 +292,7 @@ export interface SupplierRecord {
   id: string;
   workshopId?: string;
   tenantId?: string;
-  name: string;
+  name?: string;
   companyName?: string;
   supplierName?: string;
   phone?: string;
@@ -311,7 +313,7 @@ export interface SupplierRecord {
 }
 
 export interface SupplierInvoiceItem {
-  id: string;
+  id?: string;
   materialId?: string;
   materialName: string;
   quantity: number;
@@ -322,7 +324,7 @@ export interface SupplierInvoiceItem {
 
 export interface SupplierInvoiceRecord {
   id: string;
-  workshopId: string;
+  workshopId?: string;
   tenantId?: string;
   safeType?: string;
   invoiceNumber: string; // SUP-0001
@@ -330,20 +332,21 @@ export interface SupplierInvoiceRecord {
   supplierName: string;
   supplierPhone?: string;
   items: SupplierInvoiceItem[];
-  subtotal: number;
-  shipping: number;
+  subtotal?: number;
+  shipping?: number;
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number;
-  status: InvoiceStatus;
-  payments: InvoicePaymentRecord[];
+  status?: InvoiceStatus;
+  paymentMethod?: PaymentMethod | string;
+  payments?: InvoicePaymentRecord[];
   periodId?: string;
   isLocked?: boolean;
   notes?: string;
   date: string;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
 }
 
 // 6. Warehouses & Stock Movements
@@ -483,25 +486,27 @@ export interface WorkOrderRecord {
 // 8. Human Resources (HR & Payroll)
 export interface EmployeeProfile {
   id: string;
-  workshopId: string;
+  workshopId?: string;
   tenantId?: string;
   fullName: string;
-  phone: string;
+  phone?: string;
   phoneNumber?: string;
-  role: string;
+  role?: string;
   specialty?: string;
   tier?: string;
-  hireDate: string;
+  hireDate?: string;
   paymentType: EmployeePaymentType;
-  baseWage: number;
-  currentAdvanceBalance: number;
+  pieceRatePercentage?: number;
+  baseWage?: number;
+  baseSalary?: number;
+  currentAdvanceBalance?: number;
   totalEarned?: number;
   totalPaid?: number;
   currentBalance?: number;
   isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
 }
 
 export interface EmployeeAdvanceRecord {
@@ -527,17 +532,17 @@ export interface PayrollRecord {
   tenantId?: string;
   employeeId: string;
   employeeName: string;
-  monthYear: string; // 'YYYY-MM'
-  baseWage: number;
-  overtime: number;
-  bonuses: number;
-  deductions: number;
-  advanceRepayment: number;
-  netSalary: number;
-  paidAmount: number;
-  remainingAmount: number;
-  status: 'unpaid' | 'partially_paid' | 'paid';
-  payouts: Array<{
+  monthYear?: string; // 'YYYY-MM'
+  baseWage?: number;
+  overtime?: number;
+  bonuses?: number;
+  deductions?: number;
+  advanceRepayment?: number;
+  netSalary?: number;
+  paidAmount?: number;
+  remainingAmount?: number;
+  status?: 'unpaid' | 'partially_paid' | 'paid';
+  payouts?: Array<{
     id: string;
     date: string;
     amount: number;
@@ -552,10 +557,12 @@ export interface PayrollRecord {
   type?: string;
   date?: string;
   safeType?: string;
+  paymentMethod?: PaymentMethod;
+  notes?: string;
   registeredAsOperatingExpense?: boolean;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
+  createdAt?: number;
+  updatedAt?: number;
+  createdBy?: string;
 }
 
 // 9. Periods & Closing (الفترات المحاسبية وقفل الشهر)
@@ -737,3 +744,30 @@ export type AuthUserRecord = {
   role?: string;
   createdAt?: number;
 };
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'falcon' | string;
+  text: string;
+  timestamp: number;
+  actionChip?: string;
+}
+
+export interface AIVisionAnalysis {
+  modelDetectedName?: string;
+  complexityLevel?: string;
+  yarnType?: string;
+  totalWeightGrams?: number;
+  estWorkHours?: number;
+  competitionPricing?: {
+    minMarketPrice?: number;
+    recommendedFairPrice?: number;
+    maxMarketPrice?: number;
+    avgMarketPrice?: number;
+    [key: string]: any;
+  };
+  stitchPatterns: string[];
+  productionGuide: string[];
+  svgSchematic?: string;
+  [key: string]: any;
+}

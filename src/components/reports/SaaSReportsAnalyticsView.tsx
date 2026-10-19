@@ -69,17 +69,19 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
   const [wipeError, setWipeError] = useState('');
   const [wipeSuccess, setWipeSuccess] = useState(false);
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadAllFinancials = async () => {
     try {
-      const balances = await tenantStorage.getSafeBalances(profile.tenantId);
-      const safeTxs = await tenantStorage.getSafeTransactions(profile.tenantId);
-      const ords = await tenantStorage.getOrders(profile.tenantId);
-      const sups = await tenantStorage.getSuppliers(profile.tenantId);
-      const invoices = await tenantStorage.getSupplierInvoices(profile.tenantId);
-      const admins = await tenantStorage.getAdminCosts(profile.tenantId);
-      const payouts = await tenantStorage.getEmployeePayouts(profile.tenantId);
-      const logs = await tenantStorage.getActivityLogs(profile.tenantId);
-      const mats = await tenantStorage.getRawMaterials(profile.tenantId);
+      const balances = await tenantStorage.getSafeBalances(tenantId);
+      const safeTxs = await tenantStorage.getSafeTransactions(tenantId);
+      const ords = await tenantStorage.getOrders(tenantId);
+      const sups = await tenantStorage.getSuppliers(tenantId);
+      const invoices = await tenantStorage.getSupplierInvoices(tenantId);
+      const admins = await tenantStorage.getAdminCosts(tenantId);
+      const payouts = await tenantStorage.getEmployeePayouts(tenantId);
+      const logs = await tenantStorage.getActivityLogs(tenantId);
+      const mats = await tenantStorage.getRawMaterials(tenantId);
 
       setSafeBalances(balances);
       setSafeTransactions(safeTxs);
@@ -101,7 +103,7 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
 
   useEffect(() => {
     loadAllFinancials();
-  }, [profile.tenantId]);
+  }, [tenantId]);
 
   // Aggregate calculations
   const totalSalesRevenue = orders.reduce((sum, o) => sum + (o.amountPaid || 0), 0);
@@ -220,12 +222,12 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
   const handleExportSuppliers = () => {
     const headers = ['اسم المورد', 'الشركة', 'الهاتف', 'إجمالي المشتريات', 'المسدد', 'المتبقي الآجل'];
     const rows = suppliers.map((s) => [
-      s.name,
-      s.companyName,
-      s.phoneNumber,
-      String(s.totalPurchases),
-      String(s.totalPaid),
-      String(s.outstandingBalance),
+      s.name || '',
+      s.companyName || '',
+      s.phoneNumber || s.phone || '',
+      String(s.totalPurchases || 0),
+      String(s.totalPaid || 0),
+      String(s.outstandingBalance || 0),
     ]);
     exportToExcelCSV('كشف_الموردين_الشمس_كرافت', [headers, ...rows]);
   };
@@ -597,7 +599,7 @@ export const SaaSReportsAnalyticsView: React.FC<SaaSReportsAnalyticsViewProps> =
                             +{ord.amountPaid} {profile.currencySymbol}
                           </td>
                           <td className="p-3 font-mono text-rose-600 font-bold">
-                            {ord.remainingAmount > 0 ? `${ord.remainingAmount} ${profile.currencySymbol}` : 'مسدد بالكامل'}
+                            {(ord.remainingAmount ?? 0) > 0 ? `${ord.remainingAmount} ${profile.currencySymbol}` : 'مسدد بالكامل'}
                           </td>
                           <td className="p-3 font-mono text-stone-600 dark:text-stone-300">
                             {ord.deliveryDate || 'غير محدد'}

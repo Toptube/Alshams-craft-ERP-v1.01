@@ -487,7 +487,7 @@ export const tenantStorage = {
     // Update employee balance
     const employee = await db.employees.get(payout.employeeId);
     if (employee && (employee.tenantId === payout.tenantId || employee.workshopId === payout.workshopId)) {
-      employee.totalPaid = (employee.totalPaid || 0) + payout.amount;
+      employee.totalPaid = (employee.totalPaid || 0) + (payout.amount || 0);
       employee.currentBalance = Math.max(0, (employee.totalEarned || 0) - employee.totalPaid);
       await db.employees.put(employee);
     }

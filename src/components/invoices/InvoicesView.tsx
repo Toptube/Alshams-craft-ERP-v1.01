@@ -1030,12 +1030,12 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 value={returnItemName}
                 onChange={(e) => {
                   setReturnItemName(e.target.value);
-                  const found = returningInvoice.items.find((i) => i.productName === e.target.value);
+                  const found = (returningInvoice.items || []).find((i) => i.productName === e.target.value);
                   if (found) setReturnUnitPrice(found.unitPrice);
                 }}
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-bold"
               >
-                {returningInvoice.items.map((i, idx) => (
+                {(returningInvoice.items || []).map((i, idx) => (
                   <option key={idx} value={i.productName}>
                     {i.productName} (سعر القطعة: {i.unitPrice} ج.م)
                   </option>

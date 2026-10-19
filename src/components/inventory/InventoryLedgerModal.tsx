@@ -65,10 +65,12 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
 
   const [actionNotice, setActionNotice] = useState<{ text: string; isError?: boolean } | null>(null);
 
+  const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
   const loadData = async () => {
     try {
-      const stock = await tenantStorage.getInventory(profile.tenantId);
-      const txs = await tenantStorage.getInventoryTransactions(profile.tenantId);
+      const stock = await tenantStorage.getInventory(tenantId);
+      const txs = await tenantStorage.getInventoryTransactions(tenantId);
       setItems(stock);
       setTransactions(txs);
       if (stock.length > 0 && !selectedItemId) {
@@ -84,7 +86,7 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [profile.tenantId]);
+  }, [tenantId]);
 
   // Handle Recording New Purchase (Adds Stock)
   const handleRecordPurchase = async (e: React.FormEvent) => {
@@ -93,7 +95,7 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
 
     try {
       await tenantStorage.recordMaterialPurchase(
-        profile.tenantId,
+        tenantId,
         selectedItemId,
         purchaseQuantity,
         purchaseUnitCost,
@@ -119,7 +121,7 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
     try {
       if (adjustType === 'consume') {
         await tenantStorage.recordMaterialConsumption(
-          profile.tenantId,
+          tenantId,
           adjustItemId,
           adjustQuantity,
           adjustNotes
@@ -129,7 +131,7 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
         });
       } else {
         await tenantStorage.adjustMaterialStock(
-          profile.tenantId,
+          tenantId,
           adjustItemId,
           adjustQuantity,
           adjustNotes || 'تسوية جردية فعلية'
@@ -154,7 +156,7 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
 
     try {
       await tenantStorage.updateMaterialReorderThreshold(
-        profile.tenantId,
+        tenantId,
         editingThresholdItem.id,
         tempThresholdValue
       );

@@ -206,7 +206,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
         workshopId: workshop.id,
         invoiceNumber,
         supplierId: supplier.id,
-        supplierName: supplier.name,
+        supplierName: supplier.name || supplier.companyName || 'مورد خامات',
         items: purchaseItems.map((p, idx) => ({
           id: 'item_' + Date.now() + '_' + idx,
           materialId: p.materialId,
@@ -367,17 +367,17 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
               <span className="text-stone-500 font-bold">رصيد المورد:</span>
               <span
                 className={`font-mono font-black ${
-                  s.currentBalance > 0
+                  (s.currentBalance || 0) > 0
                     ? 'text-rose-600'
-                    : s.currentBalance < 0
+                    : (s.currentBalance || 0) < 0
                     ? 'text-emerald-600'
                     : 'text-stone-400'
                 }`}
               >
-                {s.currentBalance > 0
+                {(s.currentBalance || 0) > 0
                   ? `له ${s.currentBalance} (مطلوب منك)`
-                  : s.currentBalance < 0
-                  ? `عليه ${Math.abs(s.currentBalance)} (دفعت له زيادة)`
+                  : (s.currentBalance || 0) < 0
+                  ? `عليه ${Math.abs(s.currentBalance || 0)} (دفعت له زيادة)`
                   : 'خالص (0)'}
               </span>
             </div>
