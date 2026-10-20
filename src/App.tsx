@@ -20,6 +20,7 @@ import { GlobalSearchModal, GlobalSearchDataCache } from './components/search/Gl
 import { UserGuideModal } from './components/guide/UserGuideModal';
 import { CloudMigrationModal } from './components/migration/CloudMigrationModal';
 import { ProfileSettingsModal } from './components/profile/ProfileSettingsModal';
+import { FamilyWelcomeModal } from './components/welcome/FamilyWelcomeModal';
 import { InventoryLedgerModal } from './components/inventory/InventoryLedgerModal';
 import { AdminExpensesModal } from './components/adminCosts/AdminExpensesModal';
 import { WhatsAppQuoteDrawer } from './components/sharing/WhatsAppQuoteDrawer';
@@ -31,6 +32,7 @@ import {
 } from './components/modals/CreationModals';
 import { tenantStorage } from './db/dexieDB';
 import { firestoreService } from './db/firestoreService';
+import { auth, onAuthStateChanged, signOut } from './lib/firebase';
 import {
   PlusCircle,
   Calculator,
@@ -106,6 +108,8 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
   const [isAdminCostsModalOpen, setIsAdminCostsModalOpen] = useState(false);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [welcomeType, setWelcomeType] = useState<'first_time' | 'session_return'>('session_return');
 
   // WhatsApp Quote Drawer State
   const [quoteRecord, setQuoteRecord] = useState<SavedProductRecord | null>(null);
@@ -189,45 +193,101 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Absolute Authentication Root: Default strictly to Login/Signup portal on startup
-  useEffect(() => {
-    const sessionActive = sessionStorage.getItem('alshams_session_verified');
-    const savedTenantId = localStorage.getItem('alshams_active_tenant_id');
+  const triggerWelcomeFlow = useCallback((profile: UserProfile) => {
+    if (profile.welcomeShown !== true) {
+      setWelcomeType('first_time');
+      setIsWelcomeModalOpen(true);
+      try {
+        sessionStorage.setItem('alshams_welcome_shown_session', 'true');
+      } catch (e) {}
+    } else {
+      let sessionWelcomed = false;
+      try {
+        sessionWelcomed = sessionStorage.getItem('alshams_welcome_shown_session') === 'true';
+      } catch (e) {}
+      if (!sessionWelcomed) {
+        setWelcomeType('session_return');
+        setIsWelcomeModalOpen(true);
+        try {
+          sessionStorage.setItem('alshams_welcome_shown_session', 'true');
+        } catch (e) {}
+      }
+    }
+  }, []);
 
-    if (sessionActive === 'true' && savedTenantId) {
-      tenantStorage
-        .getProfile(savedTenantId)
-        .then((profile) => {
+  const handleCloseWelcomeModal = async () => {
+    setIsWelcomeModalOpen(false);
+    if (welcomeType === 'first_time' && currentProfile && currentProfile.welcomeShown !== true) {
+      const updated: UserProfile = { ...currentProfile, welcomeShown: true, updatedAt: Date.now() };
+      setCurrentProfile(updated);
+      try {
+        await tenantStorage.saveProfile(updated);
+        await firestoreService.setWorkshop(updated);
+      } catch (err) {
+        console.error('Failed to save welcomeShown flag:', err);
+      }
+    }
+  };
+
+  // Persistent Firebase Authentication State via onAuthStateChanged
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          let profile: UserProfile | null = await firestoreService.getWorkshop(firebaseUser.uid);
+          if (!profile) {
+            const local = await tenantStorage.getProfile(firebaseUser.uid);
+            if (local) profile = local;
+          }
+          if (!profile) {
+            const savedTenantId = localStorage.getItem('alshams_active_tenant_id');
+            if (savedTenantId) {
+              const local = await tenantStorage.getProfile(savedTenantId);
+              if (local) profile = local;
+            }
+          }
           if (profile) {
             setCurrentProfile(profile);
+            const tid = profile.tenantId || profile.workshopId || profile.id || firebaseUser.uid;
+            localStorage.setItem('alshams_active_tenant_id', tid);
+            triggerWelcomeFlow(profile);
             if (!localStorage.getItem('alshams_crafts_selected')) {
               setIsCraftsSelectorOpen(true);
             }
           }
-        })
-        .finally(() => {
-          setAuthChecked(true);
-        });
-    } else {
-      // First startup / unverified session lands directly on AuthGateway
+        } catch (err) {
+          console.error('Failed to restore workshop profile for user:', err);
+        }
+      } else {
+        setCurrentProfile(null);
+      }
       setAuthChecked(true);
-    }
-  }, []);
+    });
+
+    return () => unsubscribe();
+  }, [triggerWelcomeFlow]);
 
   const handleAuthenticated = (profile: UserProfile) => {
     setCurrentProfile(profile);
     const tid = profile.tenantId || profile.workshopId || profile.id || '';
     localStorage.setItem('alshams_active_tenant_id', tid);
-    sessionStorage.setItem('alshams_session_verified', 'true');
+    triggerWelcomeFlow(profile);
     // Rule 5: بعد الدخول لأول مرة، يظهر مكوّن اختيار الأقسام CraftsSelectorModal مرة واحدة ثم يُحفظ الاختيار
     if (!localStorage.getItem('alshams_crafts_selected')) {
       setIsCraftsSelectorOpen(true);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error('Sign out error:', e);
+    }
     localStorage.removeItem('alshams_active_tenant_id');
-    sessionStorage.removeItem('alshams_session_verified');
+    try {
+      sessionStorage.removeItem('alshams_welcome_shown_session');
+    } catch (e) {}
     setCurrentProfile(null);
     setIsMobileMenuOpen(false);
   };
@@ -723,6 +783,14 @@ export default function App() {
         onMigrationComplete={() => {
           loadNotifications();
         }}
+      />
+
+      {/* Family Welcome Modal (رسالة الترحيب الدافئة بعيلة الشمساوية) */}
+      <FamilyWelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={handleCloseWelcomeModal}
+        profile={currentProfile}
+        type={welcomeType}
       />
 
       {/* Footer Attribution Watermark */}

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { UserProfile, Gender } from '../../types';
+import { UserProfile, Gender, getDefaultFamilyNickname } from '../../types';
 import { COUNTRIES_CONFIG, getGenderArtistTitle } from '../../utils/macrameMath';
 import { tenantStorage } from '../../db/dexieDB';
+import { firestoreService } from '../../db/firestoreService';
 import {
   X,
   Building2,
@@ -20,6 +21,10 @@ import {
   KeyRound,
   Trash2,
   AlertTriangle,
+  Download,
+  Database,
+  Heart,
+  Sparkles,
 } from 'lucide-react';
 
 interface ProfileSettingsModalProps {
@@ -39,15 +44,23 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'factory_reset'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'backup' | 'factory_reset'>('profile');
 
   // Profile fields
   const [brandName, setBrandName] = useState(profile.brandName || '');
   const [artistName, setArtistName] = useState(profile.artistName || '');
+  const [familyNickname, setFamilyNickname] = useState(
+    profile.familyNickname || getDefaultFamilyNickname(profile.artistName, profile.gender)
+  );
   const [gender, setGender] = useState<Gender>(profile.gender || 'female');
   const [countryName, setCountryName] = useState(profile.country || 'جمهورية مصر العربية');
   const [phoneNumber, setPhoneNumber] = useState(profile.phoneNumber || '');
   const [logoUrl, setLogoUrl] = useState(profile.logoUrl || '');
+
+  // Backup Export state
+  const [exporting, setExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   // Socials
   const [activeSocials, setActiveSocials] = useState({
@@ -151,6 +164,8 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         ...profile,
         brandName: brandName.trim(),
         artistName: artistName.trim(),
+        familyNickname:
+          familyNickname.trim() || getDefaultFamilyNickname(artistName.trim(), gender),
         gender,
         country: currentCountryConfig.name,
         callingCode: currentCountryConfig.callingCode,
@@ -180,6 +195,80 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       setValidationError(err.message || 'حدث خطأ أثناء حفظ الملف');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleExportBackupJson = async () => {
+    setExportError('');
+    setExporting(true);
+    try {
+      const tid = profile.tenantId || profile.workshopId || profile.id;
+      const [
+        treasuries,
+        treasuryTransactions,
+        customers,
+        suppliers,
+        supplierInvoices,
+        materials,
+        inventoryTransactions,
+        invoices,
+        workOrders,
+        employees,
+        payouts,
+        products,
+      ] = await Promise.all([
+        firestoreService.getTreasuries(tid).catch(() => []),
+        tenantStorage.getSafeTransactions(tid).catch(() => []),
+        tenantStorage.getCustomers(tid).catch(() => []),
+        tenantStorage.getSuppliers(tid).catch(() => []),
+        firestoreService.getSupplierInvoices(tid).catch(() => []),
+        tenantStorage.getRawMaterials(tid).catch(() => []),
+        tenantStorage.getInventoryTransactions(tid).catch(() => []),
+        tenantStorage.getOrders(tid).catch(() => []),
+        firestoreService.getWorkOrders(tid).catch(() => []),
+        tenantStorage.getEmployees(tid).catch(() => []),
+        tenantStorage.getEmployeePayouts(tid).catch(() => []),
+        firestoreService.getFinishedProducts(tid).catch(() => []),
+      ]);
+
+      const backupData = {
+        exportVersion: '1.0',
+        exportedAt: new Date().toISOString(),
+        workshopId: tid,
+        profile,
+        treasuries,
+        treasuryTransactions,
+        customers,
+        suppliers,
+        supplierInvoices,
+        rawMaterials: materials,
+        inventoryTransactions,
+        invoices,
+        workOrders,
+        employees,
+        payouts,
+        products,
+      };
+
+      const dataStr =
+        'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute(
+        'download',
+        `alshams_craft_backup_${(profile.brandName || 'workshop').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3500);
+    } catch (err: any) {
+      console.error('Backup export failed:', err);
+      setExportError(err.message || 'فشل تصدير النسخة الاحتياطية');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -248,6 +337,18 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
             }`}
           >
             البيانات الأساسية للفنان
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('backup')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'backup'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>النسخ الاحتياطي (JSON)</span>
           </button>
           <button
             type="button"
@@ -345,6 +446,23 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                   placeholder="الاسم الكريم"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 focus:placeholder-transparent"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                  <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                  <span>اسمك في العيلة (اختياري)</span>
+                </label>
+                <input
+                  type="text"
+                  value={familyNickname}
+                  onChange={(e) => setFamilyNickname(e.target.value)}
+                  placeholder={getDefaultFamilyNickname(artistName, gender)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <span className="text-[10px] text-stone-400 mt-1 block">
+                  الاسم أو اللقب المحبب لك داخل عيلة الشمساوية (الافتراضي: {gender === 'female' ? 'الاسم الأول + الشمساوية' : 'الاسم الأول + الشمساوي'}).
+                </span>
               </div>
 
               <div>
@@ -472,7 +590,73 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
           </div>
         )}
 
-        {/* TAB 2: FACTORY RESET (تصفير قاعدة البيانات المحمي بكلمة المرور) */}
+        {/* TAB 2: BACKUP EXPORT (JSON) */}
+        {activeTab === 'backup' && (
+          <div className="mt-4 space-y-4">
+            <div className="p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-stone-800 dark:text-stone-200 space-y-3">
+              <div className="flex items-center gap-2.5 text-amber-800 dark:text-amber-300">
+                <Database className="w-5 h-5 flex-shrink-0" />
+                <h3 className="font-black text-sm">
+                  النسخ الاحتياطي اليدوي الشامل لبيانات الورشة (JSON)
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+                يمكنك في أي وقت تنزيل نسخة احتياطية كاملة من بيانات ورشتك بصيغة JSON وحفظها على حاسوبك أو هاتفك.
+                الملف يتضمن جميع سجلات ورشتك المتوافقة مع هيكلة بيانات Firebase Firestore: الملف التعريفي، الخزن، الحركات المالية، فواتير العملاء، الموردين، المخزون، أوامر التشغيل، وكشوف العمال والرواتب.
+              </p>
+            </div>
+
+            {exportSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                <span>تم تجهيز النسخة الاحتياطية وتنزيل الملف بنجاح على جهازك!</span>
+              </div>
+            )}
+
+            {exportError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{exportError}</span>
+              </div>
+            )}
+
+            <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/60 space-y-2">
+              <span className="text-xs font-bold text-stone-700 dark:text-stone-300 block">
+                محتويات حزمة النسخ الاحتياطي:
+              </span>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-stone-600 dark:text-stone-400 font-medium list-disc list-inside">
+                <li>بيانات البراند وهوية المشغل واللقب العائلي</li>
+                <li>سجلات الخزن النقدية وحركاتها المالية</li>
+                <li>بيانات العملاء وأوامر البيع</li>
+                <li>سجلات الموردين وفواتير الشراء</li>
+                <li>أرصدة الخامات وتكاليف الـ WAC</li>
+                <li>أوامر التشغيل وتتبع الهالك</li>
+                <li>ملفات العمال والسلف وكشوف الرواتب</li>
+                <li>أرشيف المنتجات الجاهزة والمحفوظة</li>
+              </ul>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleExportBackupJson}
+                disabled={exporting}
+                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md shadow-amber-600/30 transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {exporting ? (
+                  <span>جاري تجميع البيانات وتجهيز الملف...</span>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>تحميل وتصدير نسخة احتياطية كاملة (JSON)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: FACTORY RESET (تصفير قاعدة البيانات المحمي بكلمة المرور) */}
         {activeTab === 'factory_reset' && (
           <form onSubmit={handleExecuteFactoryReset} className="mt-4 space-y-4">
             <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-900 text-rose-900 dark:text-rose-200 text-xs space-y-2">

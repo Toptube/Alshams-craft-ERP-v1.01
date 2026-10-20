@@ -8,6 +8,8 @@ import {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   User,
 } from 'firebase/auth';
 import {
@@ -36,8 +38,18 @@ const firebaseConfig = {
 // Singleton App
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Auth with Google Provider
+// Auth with Google Provider & Browser Local Persistence
 export const auth = getAuth(app);
+
+const ensureLocalPersistence = async (): Promise<void> => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (err) {
+    console.warn('browserLocalPersistence initialization notice:', err);
+  }
+};
+ensureLocalPersistence();
+
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
@@ -111,5 +123,8 @@ export {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  ensureLocalPersistence,
 };
 export type { User };

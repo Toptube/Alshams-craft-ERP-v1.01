@@ -77,9 +77,16 @@ export interface WorkshopProfile {
     store?: string;
     website?: string;
   };
+  familyNickname?: string;
+  welcomeShown?: boolean;
   createdAt: number;
   updatedAt: number;
   createdBy: string;
+}
+
+export function getDefaultFamilyNickname(artistName?: string, gender?: Gender): string {
+  const firstName = (artistName || '').trim().split(/\s+/)[0] || (gender === 'female' ? 'فنانة' : 'فنان');
+  return gender === 'female' ? `${firstName} الشمساوية` : `${firstName} الشمساوي`;
 }
 
 export type UserProfile = WorkshopProfile;

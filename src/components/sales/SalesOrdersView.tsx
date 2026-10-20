@@ -877,7 +877,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                     </td>
                     <td className="p-3 text-emerald-600">+{ord.amountPaid} {profile.currencySymbol}</td>
                     <td className="p-3 text-rose-600">
-                      {ord.remainingAmount > 0 ? `${ord.remainingAmount} ${profile.currencySymbol}` : 'مسدد'}
+                      {(ord.remainingAmount ?? 0) > 0 ? `${ord.remainingAmount} ${profile.currencySymbol}` : 'مسدد'}
                     </td>
                     <td className="p-3 font-sans">
                       <span className="px-2 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-[10px]">

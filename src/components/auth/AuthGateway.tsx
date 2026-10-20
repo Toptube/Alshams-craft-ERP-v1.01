@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlShamsBrandLogo } from '../brand/BrandAssets';
-import { WorkshopProfile, Gender } from '../../types';
+import { WorkshopProfile, Gender, getDefaultFamilyNickname } from '../../types';
 import { COUNTRIES_CONFIG } from '../../utils/macrameMath';
 import {
   auth,
@@ -10,6 +10,7 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   getArabicAuthErrorMessage,
+  ensureLocalPersistence,
 } from '../../lib/firebase';
 import { firestoreService } from '../../db/firestoreService';
 import {
@@ -25,6 +26,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Send,
+  X,
 } from 'lucide-react';
 
 interface AuthGatewayProps {
@@ -32,7 +34,7 @@ interface AuthGatewayProps {
 }
 
 export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => {
-  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [brandName, setBrandName] = useState('');
@@ -45,6 +47,12 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotNotice, setForgotNotice] = useState<{ text: string; isError?: boolean } | null>(null);
 
   const selectedCountry =
     COUNTRIES_CONFIG.find((c) => c.code === countryCode) || COUNTRIES_CONFIG[0];
@@ -96,13 +104,20 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
     let workshop = await firestoreService.getWorkshop(uid);
 
     if (!workshop) {
+      const artName = initialData?.artistName || userEmail.split('@')[0];
+      const gdr = initialData?.gender || 'female';
+      const famName =
+        initialData?.familyNickname || getDefaultFamilyNickname(artName, gdr);
+
       const newWorkshop: WorkshopProfile = {
         id: uid,
         ownerUid: uid,
         email: userEmail,
         brandName: initialData?.brandName || 'ورشة الإبداع الحرفي',
-        artistName: initialData?.artistName || userEmail.split('@')[0],
-        gender: initialData?.gender || 'female',
+        artistName: artName,
+        gender: gdr,
+        familyNickname: famName,
+        welcomeShown: false,
         phoneNumber: initialData?.phoneNumber || '',
         country: selectedCountry.name,
         currency: selectedCountry.currency,
@@ -139,21 +154,6 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
       return;
     }
 
-    if (mode === 'reset') {
-      setLoading(true);
-      try {
-        await sendPasswordResetEmail(auth, cleanEmail);
-        setSuccessMsg(
-          'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح، يرجى فحص صندوق الوارد أو الرسائل غير المرغوبة.'
-        );
-      } catch (err: any) {
-        setErrorMsg(getArabicAuthErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
     if (!password || password.length < 6) {
       setErrorMsg('كلمة المرور يجب ألا تقل عن 6 أحرف أو أرقام.');
       return;
@@ -162,6 +162,7 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
     setLoading(true);
 
     try {
+      await ensureLocalPersistence();
       if (mode === 'signup') {
         if (!brandName.trim()) {
           throw new Error('يرجى كتابة اسم البراند أو المشغل الخاص بك.');
@@ -175,9 +176,11 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
           brandName: brandName.trim(),
           artistName: artistName.trim(),
           gender,
+          familyNickname: getDefaultFamilyNickname(artistName.trim(), gender),
           phoneNumber: phoneNumber.trim(),
           logoBase64: brandLogo,
           selectedCrafts: ['macrame'],
+          welcomeShown: false,
         });
         onAuthenticated(workshop);
       } else {
@@ -201,11 +204,16 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
     setGoogleLoading(true);
 
     try {
+      await ensureLocalPersistence();
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      const displayName = user.displayName || 'فنان الشمس كرافت';
       const workshop = await loadOrCreateWorkshop(user.uid, user.email || 'artisan@craft.io', {
-        artistName: user.displayName || 'فنان الشمس كرافت',
+        artistName: displayName,
         brandName: user.displayName ? `براند ${user.displayName}` : 'ورشة الإبداع الفني',
+        gender: 'female',
+        familyNickname: getDefaultFamilyNickname(displayName, 'female'),
+        welcomeShown: false,
       });
       onAuthenticated(workshop);
     } catch (err: any) {
@@ -213,6 +221,50 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
       setErrorMsg(getArabicAuthErrorMessage(err));
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  // 3. Send Password Reset Link Modal
+  const handleSendResetLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotNotice(null);
+    const clean = forgotEmail.trim();
+    if (!clean || !clean.includes('@')) {
+      setForgotNotice({ text: 'يرجى إدخال بريد إلكتروني صالح.', isError: true });
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, clean);
+      setForgotNotice({
+        text: 'لو الإيميل مسجل عندنا هيوصلك رابط تغيير كلمة المرور، وراجع كمان فولدر الرسائل غير المرغوبة (Spam)',
+        isError: false,
+      });
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/invalid-email') {
+        setForgotNotice({ text: 'صيغة البريد الإلكتروني غير صالحة.', isError: true });
+      } else if (code === 'auth/too-many-requests') {
+        setForgotNotice({
+          text: 'محاولات كثيرة خاطئة، يرجى الانتظار قليلاً والمحاولة لاحقاً.',
+          isError: true,
+        });
+      } else if (code === 'auth/network-request-failed') {
+        setForgotNotice({
+          text: 'تعذر الاتصال بالخادم، يرجى التحقق من اتصال الإنترنت.',
+          isError: true,
+        });
+      } else if (code === 'auth/user-not-found') {
+        setForgotNotice({
+          text: 'لو الإيميل مسجل عندنا هيوصلك رابط تغيير كلمة المرور، وراجع كمان فولدر الرسائل غير المرغوبة (Spam)',
+          isError: false,
+        });
+      } else {
+        setForgotNotice({ text: getArabicAuthErrorMessage(err), isError: true });
+      }
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -230,7 +282,7 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
           </p>
         </div>
 
-        {/* Tabs: Login / Signup / Reset */}
+        {/* Tabs: Login / Signup Only */}
         <div className="flex items-center rounded-2xl bg-stone-100 dark:bg-stone-800 p-1 text-xs font-bold">
           <button
             type="button"
@@ -262,63 +314,44 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
           >
             فتح ورشة جديدة
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('reset');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-            className={`flex-1 py-2 rounded-xl transition cursor-pointer ${
-              mode === 'reset'
-                ? 'bg-white dark:bg-stone-900 text-amber-700 dark:text-amber-400 shadow-xs'
-                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
-            }`}
-          >
-            استعادة المرور
-          </button>
         </div>
 
         {/* Google Authentication Button */}
-        {mode !== 'reset' && (
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={googleLoading || loading}
-            className="w-full py-2.5 px-4 rounded-2xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800/80 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-bold flex items-center justify-center gap-2.5 transition shadow-xs cursor-pointer disabled:opacity-50"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"
-              />
-            </svg>
-            <span>
-              {googleLoading ? 'جاري التحقق...' : 'المتابعة والدخول بحساب Google'}
-            </span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading || loading}
+          className="w-full py-2.5 px-4 rounded-2xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800/80 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-bold flex items-center justify-center gap-2.5 transition shadow-xs cursor-pointer disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"
+            />
+          </svg>
+          <span>
+            {googleLoading ? 'جاري التحقق...' : 'المتابعة والدخول بحساب Google'}
+          </span>
+        </button>
 
-        {mode !== 'reset' && (
-          <div className="relative flex items-center justify-center my-2">
-            <div className="border-t border-stone-200 dark:border-stone-800 w-full" />
-            <span className="bg-white dark:bg-stone-900 px-3 text-[11px] text-stone-400 font-bold uppercase tracking-wider absolute">
-              أو عبر البريد الإلكتروني
-            </span>
-          </div>
-        )}
+        <div className="relative flex items-center justify-center my-2">
+          <div className="border-t border-stone-200 dark:border-stone-800 w-full" />
+          <span className="bg-white dark:bg-stone-900 px-3 text-[11px] text-stone-400 font-bold uppercase tracking-wider absolute">
+            أو عبر البريد الإلكتروني
+          </span>
+        </div>
 
         {/* Notices */}
         {errorMsg && (
@@ -355,36 +388,38 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
             </div>
           </div>
 
-          {/* Password (for login and signup) */}
-          {mode !== 'reset' && (
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300">
-                  كلمة المرور <span className="text-rose-500">*</span>
-                </label>
-                {mode === 'login' && (
-                  <button
-                    type="button"
-                    onClick={() => setMode('reset')}
-                    className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-                  >
-                    نسيت كلمة المرور؟
-                  </button>
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3.5 py-2.5 pr-9 rounded-2xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 font-mono"
-                />
-                <Lock className="w-4 h-4 text-stone-400 absolute right-3 top-3 pointer-events-none" />
-              </div>
+          {/* Password */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-stone-700 dark:text-stone-300">
+                كلمة المرور <span className="text-rose-500">*</span>
+              </label>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email);
+                    setForgotNotice(null);
+                    setShowForgotModal(true);
+                  }}
+                  className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                >
+                  نسيت كلمة المرور؟
+                </button>
+              )}
             </div>
-          )}
+            <div className="relative">
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3.5 py-2.5 pr-9 rounded-2xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+              />
+              <Lock className="w-4 h-4 text-stone-400 absolute right-3 top-3 pointer-events-none" />
+            </div>
+          </div>
 
           {/* Additional Signup Fields */}
           {mode === 'signup' && (
@@ -499,18 +534,31 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
                 <ShieldCheck className="w-4 h-4" />
                 <span>دخول الورشة السحابية</span>
               </>
-            ) : mode === 'signup' ? (
+            ) : (
               <>
                 <Sparkles className="w-4 h-4" />
                 <span>إنشاء ورشة سحابية جديدة</span>
               </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                <span>إرسال رابط الاستعادة</span>
-              </>
             )}
           </button>
+
+          {/* Forgot Password Link under the form */}
+          {mode === 'login' && (
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotEmail(email);
+                  setForgotNotice(null);
+                  setShowForgotModal(true);
+                }}
+                className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>نسيت كلمة المرور؟</span>
+              </button>
+            </div>
+          )}
         </form>
 
         {/* Footer Guarantee */}
@@ -519,6 +567,84 @@ export const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthenticated }) => 
           <span>عزل سحابي كامل ومزامنة آمنة بين أجهزتك بدون إنترنت</span>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white dark:bg-stone-900 rounded-3xl shadow-2xl border border-stone-200 dark:border-stone-800 p-6 space-y-4 text-right relative">
+            <div className="flex items-center justify-between border-b border-stone-100 dark:border-stone-800 pb-3">
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="p-1 rounded-xl text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">
+                  استعادة كلمة المرور
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
+              أدخل بريدك الإلكتروني وسنرسل لك رابطاً مباشراً لتعيين كلمة مرور جديدة.
+            </p>
+
+            {forgotNotice && (
+              <div
+                className={`p-3 rounded-2xl text-xs font-bold flex items-start gap-2 ${
+                  forgotNotice.isError
+                    ? 'bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                    : 'bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                }`}
+              >
+                {forgotNotice.isError ? (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                )}
+                <span className="leading-relaxed">{forgotNotice.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSendResetLink} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
+                  البريد الإلكتروني <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full px-3.5 py-2.5 pr-9 rounded-2xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/60 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                  <Mail className="w-4 h-4 text-stone-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full py-2.5 px-4 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs transition shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {forgotLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>أرسل رابط التغيير</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

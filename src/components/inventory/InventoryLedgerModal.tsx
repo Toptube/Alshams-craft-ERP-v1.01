@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InventoryStockItem, InventoryTransaction, UserProfile } from '../../types';
 import { tenantStorage } from '../../db/dexieDB';
+import { NumberInput } from '../ui/NumberInput';
 import {
   X,
   Boxes,
@@ -545,13 +546,10 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   الكمية المشتراة *
                 </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.1"
+                <NumberInput
                   required
                   value={purchaseQuantity}
-                  onChange={(e) => setPurchaseQuantity(Number(e.target.value))}
+                  onChange={setPurchaseQuantity}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-sm font-bold outline-none"
                 />
               </div>
@@ -560,13 +558,10 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   سعر شراء الوحدة ({profile.currencySymbol}) *
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
+                <NumberInput
                   required
                   value={purchaseUnitCost}
-                  onChange={(e) => setPurchaseUnitCost(Number(e.target.value))}
+                  onChange={setPurchaseUnitCost}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-sm font-bold outline-none"
                 />
               </div>
@@ -666,13 +661,10 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
               <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                 {adjustType === 'consume' ? 'الكمية المراد صرفها للإنتاج *' : 'الرصيد الفعلي الجديد بعد الجرد *'}
               </label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
+              <NumberInput
                 required
                 value={adjustQuantity}
-                onChange={(e) => setAdjustQuantity(Number(e.target.value))}
+                onChange={setAdjustQuantity}
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-sm font-bold outline-none"
               />
             </div>
@@ -782,13 +774,10 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   مستوى حد الطلب الأدنى الجديد ({editingThresholdItem.unit}) *
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
+                <NumberInput
                   required
                   value={tempThresholdValue}
-                  onChange={(e) => setTempThresholdValue(Number(e.target.value))}
+                  onChange={setTempThresholdValue}
                   className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 font-mono text-sm font-bold outline-none"
                 />
                 <span className="text-[10px] text-stone-400 block mt-1">
@@ -880,23 +869,17 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-bold mb-1">الرصيد الافتتاحي</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
+                  <NumberInput
                     value={newItemInitialStock}
-                    onChange={(e) => setNewItemInitialStock(Number(e.target.value))}
+                    onChange={setNewItemInitialStock}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-mono"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1">تكلفة الوحدة ({profile.currencySymbol})</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
+                  <NumberInput
                     value={newItemCost}
-                    onChange={(e) => setNewItemCost(Number(e.target.value))}
+                    onChange={setNewItemCost}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-mono"
                   />
                 </div>
@@ -907,13 +890,10 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
                   حد الطلب الأدنى (مستوى الأمان للتنبيه التلقائي في الجرس) *
                 </label>
                 <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
+                  <NumberInput
                     required
                     value={newItemMinThreshold}
-                    onChange={(e) => setNewItemMinThreshold(Number(e.target.value))}
+                    onChange={setNewItemMinThreshold}
                     placeholder="5"
                     className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 text-xs font-mono font-bold outline-none"
                   />

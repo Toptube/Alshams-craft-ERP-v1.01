@@ -12,6 +12,7 @@ import {
   PaymentMethod,
 } from '../../types';
 import { tenantStorage } from '../../db/dexieDB';
+import { NumberInput } from '../ui/NumberInput';
 import {
   X,
   PackagePlus,
@@ -132,25 +133,19 @@ export const NewMaterialModal: React.FC<{
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs font-bold mb-1">الرصيد المتاح حالياً</label>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
+            <NumberInput
               value={initialStock}
-              onChange={(e) => setInitialStock(Number(e.target.value))}
+              onChange={setInitialStock}
               className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold text-center"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold mb-1">تكلفة الوحدة ({profile.currencySymbol}) *</label>
-            <input
-              type="number"
-              min="0.1"
-              step="0.5"
+            <NumberInput
               required
               value={costPerUnit}
-              onChange={(e) => setCostPerUnit(Number(e.target.value))}
+              onChange={setCostPerUnit}
               className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold text-center"
             />
           </div>
@@ -161,13 +156,10 @@ export const NewMaterialModal: React.FC<{
             حد الطلب الأدنى (مستوى الأمان للتنبيه التلقائي في الجرس) *
           </label>
           <div className="relative">
-            <input
-              type="number"
-              min="0"
-              step="0.5"
+            <NumberInput
               required
               value={minAlertThreshold}
-              onChange={(e) => setMinAlertThreshold(Number(e.target.value))}
+              onChange={setMinAlertThreshold}
               placeholder="5"
               className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700/80 bg-amber-50/50 dark:bg-amber-950/20 font-mono text-xs font-bold outline-none"
             />
@@ -557,26 +549,20 @@ export const NewSupplierModal: React.FC<{
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-bold mb-1">الكمية المشتراة *</label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.1"
+                <NumberInput
                   required
                   value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  onChange={setQuantity}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold mb-1">سعر شراء الوحدة الجديد ({profile.currencySymbol}) *</label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.5"
+                <NumberInput
                   required
                   value={unitCost}
-                  onChange={(e) => setUnitCost(Number(e.target.value))}
+                  onChange={setUnitCost}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                 />
               </div>
@@ -585,10 +571,9 @@ export const NewSupplierModal: React.FC<{
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-bold mb-1">المبلغ المسدد الآن</label>
-                <input
-                  type="number"
+                <NumberInput
                   value={paidAmount}
-                  onChange={(e) => setPaidAmount(Number(e.target.value))}
+                  onChange={setPaidAmount}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                 />
               </div>

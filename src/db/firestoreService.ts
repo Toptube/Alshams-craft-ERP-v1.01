@@ -382,7 +382,7 @@ export const firestoreService = {
     const colRef = getColRef(workshopId, 'invoices');
     const snap = await getDocs(colRef);
     const list = snap.docs.map((d) => d.data() as InvoiceRecord);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async getNextInvoiceNumber(workshopId: string): Promise<string> {
@@ -416,9 +416,10 @@ export const firestoreService = {
       const custSnap = await t.get(custRef);
       if (custSnap.exists()) {
         const custData = custSnap.data() as CustomerRecord;
-        // Adjust customer invoiced totals
-        const oldInvoiceTotal = invSnap.exists() ? (invSnap.data() as InvoiceRecord).totalAmount : 0;
-        const diff = invoice.totalAmount - oldInvoiceTotal;
+        const oldInvoiceTotal = invSnap.exists()
+          ? ((invSnap.data() as InvoiceRecord).totalAmount || 0)
+          : 0;
+        const diff = (invoice.totalAmount || 0) - oldInvoiceTotal;
         const newTotalInvoiced = Math.max(0, (custData.totalInvoiced || 0) + diff);
         const balRes = calculateCustomerBalance(
           newTotalInvoiced,
@@ -462,8 +463,9 @@ export const firestoreService = {
       const trData = trSnap.data() as TreasuryItem;
       const updatedPayments = [...(invData.payments || []), payment];
       const newPaidAmount = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
-      const newRemaining = Math.max(0, Math.round((invData.totalAmount - newPaidAmount) * 100) / 100);
-      const newStatus = determineInvoiceStatus(invData.totalAmount, newPaidAmount);
+      const totalInv = invData.totalAmount || 0;
+      const newRemaining = Math.max(0, Math.round((totalInv - newPaidAmount) * 100) / 100);
+      const newStatus = determineInvoiceStatus(totalInv, newPaidAmount);
 
       // Update invoice
       t.update(invRef, {
@@ -539,11 +541,14 @@ export const firestoreService = {
 
       const updatedReturns = [...(invData.returns || []), returnRecord];
       const newReturnsTotal = updatedReturns.reduce((sum, r) => sum + r.totalAmount, 0);
-      const newGross =
-        invData.subtotal - invData.discount + invData.shipping + (invData.vatAmount || 0);
+      const sub = invData.subtotal || 0;
+      const disc = invData.discount || 0;
+      const ship = invData.shipping || 0;
+      const paid = invData.paidAmount || 0;
+      const newGross = sub - disc + ship + (invData.vatAmount || 0);
       const newTotalAmount = Math.max(0, Math.round((newGross - newReturnsTotal) * 100) / 100);
-      const newRemaining = Math.max(0, Math.round((newTotalAmount - invData.paidAmount) * 100) / 100);
-      const newStatus = determineInvoiceStatus(newTotalAmount, invData.paidAmount);
+      const newRemaining = Math.max(0, Math.round((newTotalAmount - paid) * 100) / 100);
+      const newStatus = determineInvoiceStatus(newTotalAmount, paid);
 
       t.update(invRef, {
         returns: updatedReturns,
@@ -656,7 +661,7 @@ export const firestoreService = {
     const colRef = getColRef(workshopId, 'supplierInvoices');
     const snap = await getDocs(colRef);
     const list = snap.docs.map((d) => d.data() as SupplierInvoiceRecord);
-    return list.sort((a, b) => b.createdAt - a.createdAt);
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   },
 
   async getNextSupplierInvoiceNumber(workshopId: string): Promise<string> {
@@ -1384,7 +1389,7 @@ export const firestoreService = {
       .map((d) => d.data() as InvoiceRecord)
       .filter((i) => i.date?.startsWith(monthYear));
 
-    const salesTotal = monthInvoices.reduce((sum, i) => sum + i.totalAmount, 0);
+    const salesTotal = monthInvoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0);
 
     const expCol = getColRef(workshopId, 'expenses');
     const expSnap = await getDocs(expCol);
