@@ -14,6 +14,7 @@ import { SaaSReportsAnalyticsView } from './components/reports/SaaSReportsAnalyt
 import { TreasuriesView } from './components/treasuries/TreasuriesView';
 import { InvoicesView } from './components/invoices/InvoicesView';
 import { SuppliersView } from './components/suppliers/SuppliersView';
+import { MaterialsView } from './components/materials/MaterialsView';
 import { WorkOrdersView } from './components/workOrders/WorkOrdersView';
 import { CraftsSelectorModal } from './components/onboarding/CraftsSelectorModal';
 import { GlobalSearchModal, GlobalSearchDataCache } from './components/search/GlobalSearchModal';
@@ -56,6 +57,7 @@ export type AppActiveView =
   | 'invoices'
   | 'work_orders'
   | 'suppliers'
+  | 'materials'
   | 'treasuries'
   | 'hr'
   | 'ai_agent'
@@ -124,6 +126,9 @@ export default function App() {
 
   // Notes transferred from AI to Calculator
   const [notesToTransfer, setNotesToTransfer] = useState<string | null>(null);
+
+  // Open Add Material in MaterialsView
+  const [openAddMaterialInView, setOpenAddMaterialInView] = useState(false);
 
   // Notification loader
   const loadNotifications = useCallback(async () => {
@@ -476,6 +481,20 @@ export default function App() {
               <span>الموردون</span>
             </button>
 
+            {/* 7. الخامات والوحدات */}
+            <button
+              type="button"
+              onClick={() => setActiveView('materials')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'materials'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              <span>الخامات والوحدات</span>
+            </button>
+
             {/* 7. الخزن والسيولة */}
             <button
               type="button"
@@ -563,7 +582,10 @@ export default function App() {
         {activeView === 'create_center' && (
           <CreateCenterDashboard
             profile={currentProfile}
-            onOpenNewMaterialModal={() => setIsNewMaterialModalOpen(true)}
+            onOpenNewMaterialModal={() => {
+              setOpenAddMaterialInView(true);
+              setActiveView('materials');
+            }}
             onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
             onOpenNewSupplierModal={() => setIsNewSupplierModalOpen(true)}
             onOpenNewEmployeeModal={() => setIsNewEmployeeModalOpen(true)}
@@ -576,7 +598,10 @@ export default function App() {
             profile={currentProfile}
             initialRecord={reloadedRecord}
             onOpenWhatsAppShare={handleOpenWhatsAppShare}
-            onOpenNewMaterialModal={() => setIsNewMaterialModalOpen(true)}
+            onOpenNewMaterialModal={() => {
+              setOpenAddMaterialInView(true);
+              setActiveView('materials');
+            }}
             onSavedSuccess={() => {
               // Successfully saved to archive
             }}
@@ -614,6 +639,18 @@ export default function App() {
               setIsUserGuideOpen(true);
             }}
             onOpenDocumentPreview={() => {}}
+          />
+        )}
+
+        {activeView === 'materials' && (
+          <MaterialsView
+            workshop={currentProfile}
+            initialOpenAddModal={openAddMaterialInView}
+            onResetOpenAddModal={() => setOpenAddMaterialInView(false)}
+            onOpenHelp={(sec) => {
+              setUserGuideSection(sec);
+              setIsUserGuideOpen(true);
+            }}
           />
         )}
 
@@ -708,6 +745,7 @@ export default function App() {
         isOpen={isInventoryModalOpen}
         onClose={() => setIsInventoryModalOpen(false)}
         profile={currentProfile}
+        onOpenMaterialsView={() => setActiveView('materials')}
       />
 
       <AdminExpensesModal

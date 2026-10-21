@@ -21,6 +21,7 @@ import {
   PackageCheck,
   Percent,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface WorkOrdersViewProps {
   workshop: WorkshopProfile;
@@ -442,12 +443,11 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                 <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                   الكمية المستهدفة (عدد القطع) *
                 </label>
-                <input
-                  type="number"
-                  min="1"
+                <NumberInput
+                  min={1}
                   required
                   value={targetQuantity}
-                  onChange={(e) => setTargetQuantity(Number(e.target.value))}
+                  onChange={setTargetQuantity}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono font-bold text-xs text-center"
                 />
               </div>
@@ -500,15 +500,14 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   </div>
 
                   <div className="col-span-4">
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
+                    <NumberInput
+                      min={0.1}
+                      step={0.1}
                       required
                       value={item.quantity}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         const updated = [...pulledMaterials];
-                        updated[idx].quantity = Number(e.target.value);
+                        updated[idx].quantity = val;
                         setPulledMaterials(updated);
                       }}
                       placeholder="الكمية المسحوبة"
@@ -581,12 +580,11 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   {closingOrder.productName}
                 </span>
                 <div className="w-32">
-                  <input
-                    type="number"
-                    min="1"
+                  <NumberInput
+                    min={1}
                     required
                     value={producedQuantity}
-                    onChange={(e) => setProducedQuantity(Number(e.target.value))}
+                    onChange={setProducedQuantity}
                     className="w-full px-3 py-1.5 text-center rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-stone-900 font-mono font-bold text-xs"
                   />
                 </div>
@@ -603,14 +601,13 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                   <span className="text-stone-700 dark:text-stone-300">
                     {ret.materialName} ({ret.unit}):
                   </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
+                  <NumberInput
+                    min={0}
+                    step={0.1}
                     value={ret.quantity}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const updated = [...returnedMaterials];
-                      updated[idx].quantity = Number(e.target.value);
+                      updated[idx].quantity = val;
                       setReturnedMaterials(updated);
                     }}
                     className="w-28 px-2 py-1 text-center rounded-xl border border-blue-300 dark:border-blue-700 bg-white dark:bg-stone-900 font-mono font-bold"
@@ -625,11 +622,10 @@ export const WorkOrdersView: React.FC<WorkOrdersViewProps> = ({
                 <label className="block font-bold mb-1 text-stone-700 dark:text-stone-300">
                   أجور ومصنعية اليد العاملة ({workshop.currencySymbol})
                 </label>
-                <input
-                  type="number"
-                  min="0"
+                <NumberInput
+                  min={0}
                   value={laborCost}
-                  onChange={(e) => setLaborCost(e.target.value)}
+                  onChange={(val) => setLaborCost(String(val))}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono font-bold text-center"
                 />
               </div>

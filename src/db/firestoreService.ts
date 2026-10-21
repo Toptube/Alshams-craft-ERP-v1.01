@@ -37,6 +37,7 @@ import {
   AccountingPeriodRecord,
   ActivityLogItem,
   NotificationItem,
+  UnitRecord,
 } from '../types';
 import {
   calculateWeightedAverageCost,
@@ -859,6 +860,61 @@ export const firestoreService = {
   async saveRawMaterial(workshopId: string, material: RawMaterialItem): Promise<void> {
     const docRef = getDocRef(workshopId, 'materials', material.id);
     await setDoc(docRef, { ...material, updatedAt: Date.now() }, { merge: true });
+  },
+
+  async deleteRawMaterial(workshopId: string, materialId: string): Promise<void> {
+    const docRef = getDocRef(workshopId, 'materials', materialId);
+    await deleteDoc(docRef);
+  },
+
+  // ==========================================
+  // UNITS SUBCOLLECTION
+  // ==========================================
+  async getUnits(workshopId: string): Promise<UnitRecord[]> {
+    const colRef = getColRef(workshopId, 'units');
+    const snap = await getDocs(colRef);
+    if (snap.empty) {
+      await this.ensureDefaultUnits(workshopId);
+      const newSnap = await getDocs(colRef);
+      return newSnap.docs.map((d) => d.data() as UnitRecord);
+    }
+    return snap.docs.map((d) => d.data() as UnitRecord);
+  },
+
+  async ensureDefaultUnits(workshopId: string): Promise<void> {
+    const colRef = getColRef(workshopId, 'units');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) return;
+
+    const defaults: Array<Omit<UnitRecord, 'workshopId'>> = [
+      { id: 'unit_kg_g', name: 'كيلو', subUnit: 'جرام', conversionFactor: 1000, isDefault: true },
+      { id: 'unit_l_ml', name: 'لتر', subUnit: 'مل', conversionFactor: 1000, isDefault: true },
+      { id: 'unit_m_cm', name: 'متر', subUnit: 'سم', conversionFactor: 100, isDefault: true },
+      { id: 'unit_m_mm', name: 'متر', subUnit: 'مم', conversionFactor: 1000, isDefault: true },
+      { id: 'unit_piece', name: 'قطعة', subUnit: 'قطعة', conversionFactor: 1, isDefault: true },
+      { id: 'unit_dozen', name: 'دستة', subUnit: 'قطعة', conversionFactor: 12, isDefault: true },
+      { id: 'unit_pair', name: 'زوج', subUnit: 'قطعة', conversionFactor: 2, isDefault: true },
+      { id: 'unit_roll', name: 'لفة', subUnit: 'متر', conversionFactor: 100, isDefault: true },
+      { id: 'unit_box', name: 'علبة', subUnit: 'قطعة', conversionFactor: 10, isDefault: true },
+      { id: 'unit_bag', name: 'كيس', subUnit: 'قطعة', conversionFactor: 10, isDefault: true },
+    ];
+
+    const batch = writeBatch(db);
+    for (const u of defaults) {
+      const docRef = getDocRef(workshopId, 'units', u.id);
+      batch.set(docRef, { ...u, workshopId, createdAt: Date.now(), updatedAt: Date.now() });
+    }
+    await batch.commit();
+  },
+
+  async saveUnit(workshopId: string, unit: UnitRecord): Promise<void> {
+    const docRef = getDocRef(workshopId, 'units', unit.id);
+    await setDoc(docRef, { ...unit, workshopId, updatedAt: Date.now() }, { merge: true });
+  },
+
+  async deleteUnit(workshopId: string, unitId: string): Promise<void> {
+    const docRef = getDocRef(workshopId, 'units', unitId);
+    await deleteDoc(docRef);
   },
 
   async getFinishedProducts(workshopId: string): Promise<FinishedProductItem[]> {

@@ -43,6 +43,7 @@ import {
   UserCheck,
   PlusCircle,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface ProductionCalculatorProps {
   profile: UserProfile;
@@ -559,10 +560,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
               </div>
 
               {overrideStrandsActive ? (
-                <input
-                  type="number"
+                <NumberInput
                   value={manualStrands}
-                  onChange={(e) => setManualStrands(e.target.value)}
+                  onChange={(val) => setManualStrands(String(val))}
                   className="w-20 px-2 py-1 text-center rounded-lg border-2 border-amber-500 bg-white dark:bg-stone-900 text-amber-700 dark:text-amber-300 font-bold text-sm outline-none font-mono"
                 />
               ) : (
@@ -601,10 +601,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
               </div>
 
               {overrideLengthActive ? (
-                <input
-                  type="number"
+                <NumberInput
                   value={manualLength}
-                  onChange={(e) => setManualLength(e.target.value)}
+                  onChange={(val) => setManualLength(String(val))}
                   className="w-20 px-2 py-1 text-center rounded-lg border-2 border-amber-500 bg-white dark:bg-stone-900 text-amber-700 dark:text-amber-300 font-bold text-sm outline-none font-mono"
                 />
               ) : (
@@ -643,11 +642,10 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
               </div>
 
               {overrideWeightActive ? (
-                <input
-                  type="number"
+                <NumberInput
                   step="0.05"
                   value={manualWeightKg}
-                  onChange={(e) => setManualWeightKg(e.target.value)}
+                  onChange={(val) => setManualWeightKg(String(val))}
                   className="w-24 px-2 py-1 text-center rounded-lg border-2 border-amber-500 bg-white dark:bg-stone-900 text-amber-700 dark:text-amber-300 font-bold text-sm outline-none font-mono"
                 />
               ) : (
@@ -955,10 +953,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                         <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                           قطر القاعدة (سم) *
                         </label>
-                        <input
-                          type="number"
+                        <NumberInput
                           value={baseDiameterCm}
-                          onChange={(e) => setBaseDiameterCm(Number(e.target.value))}
+                          onChange={setBaseDiameterCm}
                           className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                         />
                       </div>
@@ -967,10 +964,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                         <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                           ارتفاع الأجناب (سم) *
                         </label>
-                        <input
-                          type="number"
+                        <NumberInput
                           value={sideHeightCm}
-                          onChange={(e) => setSideHeightCm(Number(e.target.value))}
+                          onChange={setSideHeightCm}
                           className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                         />
                       </div>
@@ -1011,10 +1007,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                     <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                       القطر (سم) *
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={diameterCm}
-                      onChange={(e) => setDiameterCm(Number(e.target.value))}
+                      onChange={setDiameterCm}
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                     />
                     <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1">
@@ -1029,10 +1024,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
                   عرض الشغل المسطح (سم) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={widthCm}
-                  onChange={(e) => setWidthCm(Number(e.target.value))}
+                  onChange={setWidthCm}
                   placeholder="مثال: 60"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
                 />
@@ -1046,10 +1040,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                   <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
                     طول الشغل الكلي (سم) *
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={totalLengthCm}
-                    onChange={(e) => setTotalLengthCm(Number(e.target.value))}
+                    onChange={setTotalLengthCm}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -1058,10 +1051,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                   <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
                     طول الشراشيب (سم) *
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={fringeLengthCm}
-                    onChange={(e) => setFringeLengthCm(Number(e.target.value))}
+                    onChange={setFringeLengthCm}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -1071,10 +1063,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
                   طول الشراشيب السفلية إن وجدت (سم) (اختياري)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={fringeLengthCm}
-                  onChange={(e) => setFringeLengthCm(Number(e.target.value))}
+                  onChange={setFringeLengthCm}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -1113,10 +1104,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">
                   سعر الكيلو الافتراضي ({profile.currencySymbol}) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={pricePerKg}
-                  onChange={(e) => setPricePerKg(Number(e.target.value))}
+                  onChange={setPricePerKg}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
@@ -1151,10 +1141,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
                   تكلفة ماسورة خشب أو إكسسوارات الستارة / السجادة ({profile.currencySymbol})
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={curtainRodCost}
-                  onChange={(e) => setCurtainRodCost(Number(e.target.value))}
+                  onChange={setCurtainRodCost}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
                 />
               </div>
@@ -1166,10 +1155,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                   <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
                     تكلفة كوفر القماش ({profile.currencySymbol})
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={cushionCoverCost}
-                    onChange={(e) => setCushionCoverCost(Number(e.target.value))}
+                    onChange={setCushionCoverCost}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
                   />
                 </div>
@@ -1177,10 +1165,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                   <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
                     تكلفة الفايبر ({profile.currencySymbol})
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={fiberCost}
-                    onChange={(e) => setFiberCost(Number(e.target.value))}
+                    onChange={setFiberCost}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
                   />
                 </div>
@@ -1192,10 +1179,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
                   تكلفة الإكسسوارات (حلقات، سوستة، بطانة، حزام، قفل) ({profile.currencySymbol})
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={bagAccessoriesCost}
-                  onChange={(e) => setBagAccessoriesCost(Number(e.target.value))}
+                  onChange={setBagAccessoriesCost}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
                 />
               </div>
@@ -1273,13 +1259,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                   />
 
                   <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      step="any"
+                    <NumberInput
                       value={row.quantity}
-                      onChange={(e) =>
-                        handleUpdateMaterialRow(row.id, 'quantity', parseFloat(e.target.value) || 0)
-                      }
+                      onChange={(val) => handleUpdateMaterialRow(row.id, 'quantity', val)}
                       placeholder="الكمية"
                       className="w-16 px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-bold font-mono outline-none text-center focus:placeholder-transparent"
                     />
@@ -1298,13 +1280,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
 
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-stone-500">سعر:</span>
-                    <input
-                      type="number"
-                      step="any"
+                    <NumberInput
                       value={row.unitPrice}
-                      onChange={(e) =>
-                        handleUpdateMaterialRow(row.id, 'unitPrice', parseFloat(e.target.value) || 0)
-                      }
+                      onChange={(val) => handleUpdateMaterialRow(row.id, 'unitPrice', val)}
                       placeholder="السعر"
                       className="w-16 px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-bold font-mono outline-none text-center focus:placeholder-transparent"
                     />
@@ -1360,10 +1338,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   أجرة المصنعية لليد ({profile.currencySymbol}) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={laborWage}
-                  onChange={(e) => setLaborWage(Number(e.target.value))}
+                  onChange={setLaborWage}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                 />
               </div>
@@ -1390,10 +1367,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   تكلفة التغليف ({profile.currencySymbol}) *
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={packagingCost}
-                  onChange={(e) => setPackagingCost(Number(e.target.value))}
+                  onChange={setPackagingCost}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                 />
               </div>
@@ -1402,10 +1378,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   مصاريف النقل الداخلي ({profile.currencySymbol})
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={transitFees}
-                  onChange={(e) => setTransitFees(Number(e.target.value))}
+                  onChange={setTransitFees}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                 />
               </div>
@@ -1414,10 +1389,9 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   نصيب القطعة من التكاليف الإدارية الموحدة ({profile.currencySymbol})
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={adminExpensesShare}
-                  onChange={(e) => setAdminExpensesShare(Number(e.target.value))}
+                  onChange={setAdminExpensesShare}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-sm font-bold font-mono outline-none"
                 />
               </div>

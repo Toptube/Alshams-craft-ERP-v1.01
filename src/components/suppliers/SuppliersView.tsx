@@ -23,6 +23,7 @@ import {
   Trash2,
   Boxes,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface SuppliersViewProps {
   workshop: WorkshopProfile;
@@ -620,26 +621,24 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
                   </div>
 
                   <div className="col-span-3">
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
+                    <NumberInput
+                      min={0.1}
+                      step={0.1}
                       required
                       value={item.quantity}
-                      onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
+                      onChange={(val) => handleItemChange(idx, 'quantity', val)}
                       placeholder="الكمية"
                       className="w-full px-2 py-1.5 text-center rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold"
                     />
                   </div>
 
                   <div className="col-span-3">
-                    <input
-                      type="number"
-                      min="0.5"
-                      step="0.5"
+                    <NumberInput
+                      min={0.5}
+                      step={0.5}
                       required
                       value={item.unitCost}
-                      onChange={(e) => handleItemChange(idx, 'unitCost', Number(e.target.value))}
+                      onChange={(val) => handleItemChange(idx, 'unitCost', val)}
                       placeholder="سعر الوحدة"
                       className="w-full px-2 py-1.5 text-center rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold"
                     />
@@ -704,12 +703,11 @@ export const SuppliersView: React.FC<SuppliersViewProps> = ({
               <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                 المبلغ المسدد للمورد ({workshop.currencySymbol}) *
               </label>
-              <input
-                type="number"
-                min="1"
+              <NumberInput
+                min={1}
                 required
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                onChange={(val) => setPaymentAmount(String(val))}
                 className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20 text-sm font-mono font-bold text-center outline-none"
               />
             </div>

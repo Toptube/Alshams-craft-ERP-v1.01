@@ -366,6 +366,17 @@ export interface WarehouseRecord {
   itemCount: number;
 }
 
+export interface UnitRecord {
+  id: string;
+  workshopId?: string;
+  name: string; // الوحدة الكبرى (كيلو، لتر، متر، قطعة، دستة، زوج، لفة، علبة، كيس)
+  subUnit: string; // الوحدة الصغرى (جرام، مل، سم، مم، قطعة...)
+  conversionFactor: number; // معامل التحويل: كم وحدة صغرى في الوحدة الكبرى
+  isDefault?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface RawMaterialItem {
   id: string;
   workshopId?: string;
@@ -373,9 +384,14 @@ export interface RawMaterialItem {
   supplierId?: string;
   materialName: string;
   category: string;
+  materialCategory?: 'خامة أساسية' | 'خامة إضافية' | 'basic' | 'extra';
   unit: string;
+  subUnit?: string;
+  conversionFactor?: number;
+  marketName?: string; // الاسم بالسوق (شلة / بكرة...)
+  marketUnitRatio?: number; // الواحدة منها تساوي كم من الوحدة الكبرى
   currentStock: number;
-  costPerUnit: number; // Weighted Average Cost
+  costPerUnit: number; // سعر الشراء / Weighted Average Cost
   costPerGram: number;
   supplierName?: string;
   warehouseLocation?: string;

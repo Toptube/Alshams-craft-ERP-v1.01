@@ -23,6 +23,7 @@ import {
   TrendingDown,
   Building,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface HRWorkforceModuleProps {
   profile: UserProfile;
@@ -306,12 +307,11 @@ export const HRWorkforceModule: React.FC<HRWorkforceModuleProps> = ({
 
               <div>
                 <label className="block text-xs font-bold mb-1">المبلغ المنصرف ({profile.currencySymbol}) *</label>
-                <input
-                  type="number"
-                  min="1"
+                <NumberInput
+                  min={1}
                   required
                   value={payoutAmount}
-                  onChange={(e) => setPayoutAmount(Number(e.target.value))}
+                  onChange={setPayoutAmount}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                 />
               </div>

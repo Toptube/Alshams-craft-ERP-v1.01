@@ -14,6 +14,7 @@ import {
   DollarSign,
   TrendingDown,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface AdminExpensesModalProps {
   isOpen: boolean;
@@ -191,12 +192,11 @@ export const AdminExpensesModal: React.FC<AdminExpensesModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <input
-                type="number"
+              <NumberInput
                 required
-                min="1"
+                min={1}
                 value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
+                onChange={setAmount}
                 placeholder={`المبلغ (${profile.currencySymbol})`}
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-xs font-bold outline-none"
               />

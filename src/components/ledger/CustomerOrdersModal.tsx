@@ -13,6 +13,7 @@ import {
   Clock,
   Send,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface CustomerOrdersModalProps {
   isOpen: boolean;
@@ -444,29 +445,26 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-xs font-bold mb-1">سعر المنتج</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       required
                       value={orderPrice}
-                      onChange={(e) => setOrderPrice(Number(e.target.value))}
+                      onChange={setOrderPrice}
                       className="w-full px-2.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1">الشحن</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={orderShipping}
-                      onChange={(e) => setOrderShipping(Number(e.target.value))}
+                      onChange={setOrderShipping}
                       className="w-full px-2.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1">الخصم</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={orderDiscount}
-                      onChange={(e) => setOrderDiscount(Number(e.target.value))}
+                      onChange={setOrderDiscount}
                       className="w-full px-2.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                     />
                   </div>
@@ -475,10 +473,9 @@ export const CustomerOrdersModal: React.FC<CustomerOrdersModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold mb-1">المدفوع حالياً (العربون)</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={orderAmountPaid}
-                      onChange={(e) => setOrderAmountPaid(Number(e.target.value))}
+                      onChange={setOrderAmountPaid}
                       className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold"
                     />
                   </div>

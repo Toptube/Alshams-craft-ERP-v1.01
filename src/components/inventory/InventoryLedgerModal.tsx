@@ -23,12 +23,14 @@ interface InventoryLedgerModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile;
+  onOpenMaterialsView?: () => void;
 }
 
 export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
   isOpen,
   onClose,
   profile,
+  onOpenMaterialsView,
 }) => {
   if (!isOpen) return null;
 
@@ -373,13 +375,28 @@ export const InventoryLedgerModal: React.FC<InventoryLedgerModalProps> = ({
             <span>سجل حركات المخزن ({transactions.length})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsAddingNewItem(true)}
-            className="mr-auto px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 text-amber-900 dark:text-amber-200 transition cursor-pointer"
-          >
-            + تعريف صنف جديد
-          </button>
+          <div className="mr-auto flex items-center gap-2">
+            {onOpenMaterialsView && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenMaterialsView();
+                }}
+                className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>صفحة الخامات والوحدات ➔</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsAddingNewItem(true)}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 text-amber-900 dark:text-amber-200 transition cursor-pointer"
+            >
+              + تعريف صنف جديد
+            </button>
+          </div>
         </div>
 
         {/* TAB 1: Stock List with Reorder Points & Quick Actions */}

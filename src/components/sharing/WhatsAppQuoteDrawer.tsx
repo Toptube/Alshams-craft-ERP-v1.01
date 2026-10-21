@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SavedProductRecord, UserProfile } from '../../types';
 import { getGenderArtistTitle } from '../../utils/macrameMath';
 import { X, Copy, Check, Share2, Send, Sparkles, Truck, Gift, DollarSign } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface WhatsAppQuoteDrawerProps {
   isOpen: boolean;
@@ -100,11 +101,10 @@ export const WhatsAppQuoteDrawer: React.FC<WhatsAppQuoteDrawerProps> = ({
                 <Truck className="w-3.5 h-3.5 text-stone-500" />
                 <span>تكلفة الشحن ({profile.currencySymbol})</span>
               </label>
-              <input
-                type="number"
-                min="0"
+              <NumberInput
+                min={0}
                 value={shippingCost}
-                onChange={(e) => setShippingCost(Number(e.target.value))}
+                onChange={setShippingCost}
                 placeholder="0 إذا لم يوجد شحن"
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
               />
@@ -116,11 +116,10 @@ export const WhatsAppQuoteDrawer: React.FC<WhatsAppQuoteDrawerProps> = ({
                 <Gift className="w-3.5 h-3.5 text-stone-500" />
                 <span>قيمة الخصم للعميل ({profile.currencySymbol})</span>
               </label>
-              <input
-                type="number"
-                min="0"
+              <NumberInput
+                min={0}
                 value={discountAmount}
-                onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                onChange={setDiscountAmount}
                 placeholder="0 إذا لم يوجد خصم"
                 className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-sm font-bold outline-none"
               />

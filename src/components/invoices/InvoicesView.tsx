@@ -34,6 +34,7 @@ import {
   Trash2,
   Calendar,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface InvoicesViewProps {
   workshop: WorkshopProfile;
@@ -753,25 +754,23 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                     </div>
 
                     <div className="col-span-2">
-                      <input
-                        type="number"
-                        min="1"
+                      <NumberInput
+                        min={1}
                         required
                         value={item.quantity}
-                        onChange={(e) => handleLineItemChange(idx, 'quantity', Number(e.target.value))}
+                        onChange={(val) => handleLineItemChange(idx, 'quantity', val)}
                         className="w-full px-2 py-1.5 text-center rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold text-xs"
                       />
                     </div>
 
                     <div className="col-span-3 sm:col-span-3">
                       <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
+                        <NumberInput
+                          min={0}
+                          step={1}
                           required
                           value={item.unitPrice}
-                          onChange={(e) => handleLineItemChange(idx, 'unitPrice', Number(e.target.value))}
+                          onChange={(val) => handleLineItemChange(idx, 'unitPrice', val)}
                           className="w-full px-2 py-1.5 text-center rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold text-xs"
                         />
                         <span className="absolute left-2 top-2 text-[10px] text-stone-400">ج.م</span>
@@ -800,11 +799,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <label className="block font-bold mb-1 text-stone-700 dark:text-stone-300">
                     الخصم الممنوح ({workshop.currencySymbol})
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumberInput
+                    min={0}
                     value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
+                    onChange={(val) => setDiscount(String(val))}
                     className="w-full px-2.5 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold text-xs text-center"
                   />
                 </div>
@@ -813,11 +811,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                   <label className="block font-bold mb-1 text-stone-700 dark:text-stone-300">
                     مصاريف الشحن / التوصيل
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumberInput
+                    min={0}
                     value={shipping}
-                    onChange={(e) => setShipping(e.target.value)}
+                    onChange={(val) => setShipping(String(val))}
                     className="w-full px-2.5 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono font-bold text-xs text-center"
                   />
                 </div>
@@ -922,13 +919,12 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
               <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                 مبلغ الدفعة المسددة ({workshop.currencySymbol}) *
               </label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
+              <NumberInput
+                min={0.5}
+                step={0.5}
                 required
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                onChange={(val) => setPaymentAmount(String(val))}
                 className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20 text-sm font-mono font-bold text-center outline-none"
               />
             </div>
@@ -1048,12 +1044,11 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                   الكمية المرتجعة
                 </label>
-                <input
-                  type="number"
-                  min="1"
+                <NumberInput
+                  min={1}
                   required
                   value={returnQuantity}
-                  onChange={(e) => setReturnQuantity(Number(e.target.value))}
+                  onChange={setReturnQuantity}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono font-bold text-xs text-center"
                 />
               </div>

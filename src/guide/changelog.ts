@@ -8,6 +8,15 @@ export interface ChangelogRelease {
 
 export const CHANGELOG_RELEASES: ChangelogRelease[] = [
   {
+    version: '3.2.0',
+    date: '21 أكتوبر 2026',
+    title: 'صفحة الخامات ونظام وحدات القياس',
+    highlights: [
+      'إضافة صفحة الخامات الشاملة ونظام وحدات القياس، لتسجيل الخامات الأساسية والإضافية وأسعار الشراء والتحويل بين الوحدات بكل سهولة.',
+    ],
+    stagesImplemented: ['الخامات ووحدات القياس'],
+  },
+  {
     version: '3.1.0',
     date: '20 أكتوبر 2026',
     title: 'تطوير تجربة الدخول والترحيب العائلي والنسخ الاحتياطي اليدوي',

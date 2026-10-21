@@ -91,6 +91,12 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       icon: Truck,
     },
     {
+      id: 'materials',
+      label: 'الخامات ووحدات القياس',
+      sublabel: 'الخامات الأساسية والإضافية، الأسعار والوحدات',
+      icon: Layers,
+    },
+    {
       id: 'treasuries',
       label: 'الخزن والسيولة النقدية',
       sublabel: 'الكاش، إنستاباي، المحافظ، والتحويلات',

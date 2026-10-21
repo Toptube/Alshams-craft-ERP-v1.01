@@ -23,6 +23,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface TreasuriesViewProps {
   workshop: WorkshopProfile;
@@ -503,13 +504,12 @@ export const TreasuriesView: React.FC<TreasuriesViewProps> = ({
               <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                 المبلغ المراد تحويله ({workshop.currencySymbol}) *
               </label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
+              <NumberInput
+                min={0.5}
+                step={0.5}
                 required
                 value={transferAmount}
-                onChange={(e) => setTransferAmount(e.target.value)}
+                onChange={(val) => setTransferAmount(String(val))}
                 placeholder="1000"
                 className="w-full px-3 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20 text-sm font-mono font-bold text-center outline-none"
               />
@@ -604,12 +604,11 @@ export const TreasuriesView: React.FC<TreasuriesViewProps> = ({
                 <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                   الرصيد الافتتاحي
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
+                <NumberInput
+                  min={0}
+                  step={0.5}
                   value={newTreasuryBalance}
-                  onChange={(e) => setNewTreasuryBalance(e.target.value)}
+                  onChange={(val) => setNewTreasuryBalance(String(val))}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs font-mono font-bold text-center"
                 />
               </div>

@@ -30,6 +30,7 @@ import {
   Truck,
   Gift,
 } from 'lucide-react';
+import { NumberInput } from '../ui/NumberInput';
 
 interface SalesOrdersViewProps {
   profile: UserProfile;
@@ -447,21 +448,19 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                 {/* Option to dynamically alter quantity of pieces sold */}
                 <div className="sm:col-span-3">
                   <label className="block text-xs font-bold mb-1">تغيير إعداد القطع المباعة *</label>
-                  <input
-                    type="number"
-                    min="1"
+                  <NumberInput
+                    min={1}
                     value={itemQuantity}
-                    onChange={(e) => setItemQuantity(Math.max(1, Number(e.target.value)))}
+                    onChange={(val) => setItemQuantity(Math.max(1, val))}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold text-center outline-none"
                   />
                 </div>
 
                 <div className="sm:col-span-3">
                   <label className="block text-xs font-bold mb-1">سعر بيع القطعة ({profile.currencySymbol})</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={itemCustomPrice}
-                    onChange={(e) => setItemCustomPrice(Number(e.target.value))}
+                    onChange={setItemCustomPrice}
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold text-center outline-none"
                   />
                 </div>
@@ -605,10 +604,9 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                       <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
                         المدفوع حالياً (العربون / السداد الكامل) *
                       </label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={amountPaid}
-                        onChange={(e) => setAmountPaid(Number(e.target.value))}
+                        onChange={setAmountPaid}
                         placeholder="المبلغ المسدد"
                         className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500"
                       />
@@ -637,10 +635,9 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                               <span>تم الدفع</span>
                             </label>
                           </div>
-                          <input
-                            type="number"
+                          <NumberInput
                             value={phase1Amount}
-                            onChange={(e) => setPhase1Amount(Number(e.target.value))}
+                            onChange={setPhase1Amount}
                             placeholder="مبلغ الدفعة"
                             className="w-full px-2 py-1.5 rounded-lg border text-xs font-bold font-mono outline-none"
                           />
@@ -668,10 +665,9 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                               <span>تم الدفع</span>
                             </label>
                           </div>
-                          <input
-                            type="number"
+                          <NumberInput
                             value={phase2Amount}
-                            onChange={(e) => setPhase2Amount(Number(e.target.value))}
+                            onChange={setPhase2Amount}
                             placeholder="مبلغ الدفعة"
                             className="w-full px-2 py-1.5 rounded-lg border text-xs font-bold font-mono outline-none"
                           />
@@ -699,10 +695,9 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                               <span>تم الدفع</span>
                             </label>
                           </div>
-                          <input
-                            type="number"
+                          <NumberInput
                             value={phase3Amount}
-                            onChange={(e) => setPhase3Amount(Number(e.target.value))}
+                            onChange={setPhase3Amount}
                             placeholder="مبلغ الدفعة"
                             className="w-full px-2 py-1.5 rounded-lg border text-xs font-bold font-mono outline-none"
                           />
@@ -761,20 +756,18 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
 
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-stone-600 dark:text-stone-400">الشحن:</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={shippingCost}
-                    onChange={(e) => setShippingCost(Number(e.target.value))}
+                    onChange={setShippingCost}
                     className="w-20 px-2 py-1 text-center font-mono rounded border text-xs font-bold"
                   />
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-stone-600 dark:text-stone-400">الخصم:</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={discountAmount}
-                    onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                    onChange={setDiscountAmount}
                     className="w-20 px-2 py-1 text-center font-mono rounded border text-xs font-bold"
                   />
                 </div>

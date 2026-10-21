@@ -59,18 +59,29 @@ app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 async function requireFirebaseAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error(`[AUTH 401] Missing or invalid Authorization header on ${req.method} ${req.path}`);
     return res.status(401).json({
       error: 'غير مصرح بالدخول (401)، يرجى تسجيل الدخول إلى ورشتك أولاً.',
     });
   }
 
   const idToken = authHeader.split('Bearer ')[1].trim();
+  if (!idToken) {
+    console.error(`[AUTH 401] Empty Bearer token provided on ${req.method} ${req.path}`);
+    return res.status(401).json({
+      error: 'غير مصرح بالدخول (401)، رمز المصادقة فارغ.',
+    });
+  }
+
   try {
     const decodedToken = await getAuth().verifyIdToken(idToken);
     (req as any).user = decodedToken;
     next();
   } catch (err: any) {
-    console.error('Firebase ID token verification failed:', err?.message || err);
+    console.error(`[AUTH 401] Firebase ID token verification failed on ${req.method} ${req.path}:`, {
+      code: err?.code,
+      message: err?.message,
+    });
     return res.status(401).json({
       error: 'انتهت صلاحية جلسة الدخول أو الرمز غير صالح، يرجى إعادة تسجيل الدخول.',
       detail: err?.message,
@@ -78,8 +89,18 @@ async function requireFirebaseAuth(req: Request, res: Response, next: NextFuncti
   }
 }
 
+// 0. AI Usage Remaining Endpoint
+app.get('/api/ai/usage', requireFirebaseAuth, (req: Request, res: Response) => {
+  const uid = (req as any).user?.uid;
+  const today = new Date().toISOString().split('T')[0];
+  const record = userDailyAiUsage.get(uid);
+  const used = (!record || record.date !== today) ? 0 : record.count;
+  const remaining = Math.max(0, 20 - used);
+  return res.json({ used, remaining, limit: 20 });
+});
+
 // 1. Vision Analysis API - "صقر الشمساوية AI"
-app.post('/api/analyze-vision', requireFirebaseAuth, async (req: Request, res: Response) => {
+const handleVisionAnalysis = async (req: Request, res: Response) => {
   try {
     const uid = (req as any).user?.uid;
     const rateCheck = checkAndIncrementAiRateLimit(uid);
@@ -96,14 +117,14 @@ app.post('/api/analyze-vision', requireFirebaseAuth, async (req: Request, res: R
     }
 
     if (!aiProvider.isAvailable()) {
-      return res.status(503).json({ error: 'مفتاح GEMINI_API_KEY غير مضبوط على السيرفر' });
+      return res.status(503).json({ error: 'خدمة الذكاء الاصطناعي غير مفعّلة حالياً أو مفتاح API غير متوفر على السيرفر' });
     }
 
     const parsedData = await aiProvider.analyzeCraftVision({
       imageBase64,
       mimeType,
       artistNotes,
-      activeCrafts,
+      activeCrafts: Array.isArray(activeCrafts) ? activeCrafts : [],
     });
 
     return res.json({
@@ -113,14 +134,17 @@ app.post('/api/analyze-vision', requireFirebaseAuth, async (req: Request, res: R
   } catch (error: any) {
     console.error('Vision analysis error:', error);
     return res.status(502).json({
-      error: 'فشل استدعاء نموذج الذكاء الاصطناعي',
+      error: 'تعذر التحليل، يرجى المحاولة مرة أخرى.',
       detail: error?.message || String(error),
     });
   }
-});
+};
+
+app.post('/api/analyze-vision', requireFirebaseAuth, handleVisionAnalysis);
+app.post('/api/ai/analyze-image', requireFirebaseAuth, handleVisionAnalysis);
 
 // 2. Chat Agent API - "صقر الشمساوية AI"
-app.post('/api/chat-agent', requireFirebaseAuth, async (req: Request, res: Response) => {
+const handleChatAgent = async (req: Request, res: Response) => {
   try {
     const uid = (req as any).user?.uid;
     const rateCheck = checkAndIncrementAiRateLimit(uid);
@@ -133,28 +157,35 @@ app.post('/api/chat-agent', requireFirebaseAuth, async (req: Request, res: Respo
     const { message, chatHistory = [], actionChip = null, currentContext = {} } = req.body;
 
     if (!aiProvider.isAvailable()) {
-      return res.status(503).json({ error: 'مفتاح GEMINI_API_KEY غير مضبوط على السيرفر' });
+      return res.status(503).json({ error: 'خدمة الذكاء الاصطناعي غير مفعّلة حالياً أو مفتاح API غير متوفر على السيرفر' });
     }
 
-    const reply = await aiProvider.chatWithAgent({
+    const result = await aiProvider.chatWithAgent({
       message,
       actionChip,
       chatHistory,
       currentContext,
     });
 
+    const reply = typeof result === 'string' ? result : result.reply;
+    const sources = typeof result === 'object' && result.sources ? result.sources : [];
+
     return res.json({
       reply,
+      sources,
       dailyAiRemaining: rateCheck.remaining,
     });
   } catch (error: any) {
     console.error('Chat Agent error:', error);
     return res.status(502).json({
-      error: 'فشل استدعاء مساعد الذكاء الاصطناعي',
+      error: 'تعذر الاتصال بمساعد الذكاء الاصطناعي، يرجى المحاولة مرة أخرى.',
       detail: error?.message || String(error),
     });
   }
-});
+};
+
+app.post('/api/chat-agent', requireFirebaseAuth, handleChatAgent);
+app.post('/api/ai/chat', requireFirebaseAuth, handleChatAgent);
 
 // Start Server Engine
 async function startServer() {
