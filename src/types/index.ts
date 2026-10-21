@@ -63,6 +63,7 @@ export interface WorkshopProfile {
   currencySymbol: string;
   selectedCrafts: string[]; // Craft IDs enabled by artisan e.g. ['macrame', 'crochet']
   defaultVatPercent: number; // default 14%
+  defaultWholesaleDiscountPercent?: number; // نسبة الخصم من هامش الربح لحساب سعر الجملة (افتراضي 25%)
   commercialRegister?: string; // Optional
   taxCardNumber?: string; // Optional
   showTaxInfoOnInvoice: boolean;
@@ -730,8 +731,18 @@ export interface SavedProductRecord {
   workshopId?: string;
   tenantId?: string;
   productName: string;
-  craftId?: string;
+  productSerialNumber?: number; // رقم منتج متسلسل تلقائي
+  productCode?: string; // رمز المنتج
+  mainSectionId?: string; // القسم الرئيسي
+  mainSectionName?: string;
+  craftId?: string; // الحرفة
+  craftName?: string;
+  productType?: string; // نوع المنتج (رانر، ستائر، كوشن...)
   category: CraftCategory | string;
+  costPrice?: number; // التكلفة المباشرة + الأجور والتكاليف
+  retailPrice?: number; // السعر القطاعي
+  wholesalePrice?: number; // سعر الجملة بعد خصم نسبة من هامش الربح
+  wholesaleMarginDiscountPercent?: number; // نسبة الخصم المعتمدة من هامش الربح
   input: CalculationInput;
   output: CalculationOutput;
   imageUrl?: string;

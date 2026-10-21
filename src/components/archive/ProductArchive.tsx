@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SavedProductRecord, UserProfile, CraftCategory } from '../../types';
 import { CRAFT_CATEGORIES, getGenderArtistTitle } from '../../utils/macrameMath';
 import { tenantStorage } from '../../db/dexieDB';
+import { SUB_CRAFTS_REGISTRY } from '../../registry/craftsRegistry';
 import {
   FolderArchive,
   Search,
@@ -30,9 +31,18 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
   const [records, setRecords] = useState<SavedProductRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all');
+  const [selectedCraftFilter, setSelectedCraftFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
   const tenantId = profile.tenantId || profile.workshopId || profile.id || '';
+
+  // Crafts selected by artisan in profile
+  const userCrafts = useMemo(() => {
+    const craftIds = profile.selectedCrafts && profile.selectedCrafts.length > 0
+      ? profile.selectedCrafts
+      : ['macrame'];
+    return SUB_CRAFTS_REGISTRY.filter((c) => craftIds.includes(c.id));
+  }, [profile.selectedCrafts]);
 
   const loadRecords = async () => {
     setLoading(true);
@@ -54,6 +64,19 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
     loadRecords();
   }, [tenantId, selectedCategoryFilter, searchQuery]);
 
+  // Filter by selected craft
+  const displayedRecords = useMemo(() => {
+    if (selectedCraftFilter === 'all') return records;
+    return records.filter((r) => {
+      return (
+        r.craftId === selectedCraftFilter ||
+        r.craftName === selectedCraftFilter ||
+        r.category === selectedCraftFilter ||
+        r.productType === selectedCraftFilter
+      );
+    });
+  }, [records, selectedCraftFilter]);
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('هل أنت متأكد من حذف بطاقة التصميم هذه من الأرشيف؟')) {
@@ -64,15 +87,32 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Search & Category Filter Bar */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-sm flex flex-col sm:flex-row items-center gap-3">
-        {/* Category Filter Dropdown - REQUIRED next to archive search bar */}
-        <div className="w-full sm:w-64 flex items-center gap-2">
+      {/* Search & Category & Craft Filter Bar */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-sm flex flex-col md:flex-row items-center gap-3">
+        {/* 1. Craft Filter Dropdown - فلتر بالحِرف المختارة */}
+        <div className="w-full md:w-56 flex items-center gap-2">
+          <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <select
+            value={selectedCraftFilter}
+            onChange={(e) => setSelectedCraftFilter(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs font-bold outline-none"
+          >
+            <option value="all">كافة الحِرف (الكل)</option>
+            {userCrafts.map((craft) => (
+              <option key={craft.id} value={craft.id}>
+                {craft.nameAr}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 2. Category Filter Dropdown - REQUIRED next to archive search bar */}
+        <div className="w-full md:w-56 flex items-center gap-2">
           <Filter className="w-4 h-4 text-stone-400 flex-shrink-0" />
           <select
             value={selectedCategoryFilter}
             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-            className="w-full px-3.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs font-bold outline-none"
+            className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 text-xs font-bold outline-none"
           >
             <option value="all">كافة التصنيفات (الكل)</option>
             {CRAFT_CATEGORIES.map((cat) => (
@@ -101,11 +141,13 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
         <div className="text-center py-16 text-stone-400 text-xs">
           جاري استرجاع بطاقات التصاميم المحفوظة...
         </div>
-      ) : records.length === 0 ? (
+      ) : displayedRecords.length === 0 ? (
         <div className="p-12 text-center rounded-3xl bg-white dark:bg-stone-900 border border-dashed border-stone-300 dark:border-stone-800 space-y-3">
           <FolderArchive className="w-12 h-12 text-amber-500/40 mx-auto" />
           <h3 className="font-bold text-sm text-stone-700 dark:text-stone-300">
-            لا توجد بطاقات إنتاج محفوظة في الأرشيف
+            {records.length === 0
+              ? 'لا توجد بطاقات إنتاج محفوظة في الأرشيف'
+              : 'لا توجد منتجات مطابقة لفلتر الحرفة أو البحث'}
           </h3>
           <p className="text-xs text-stone-400 max-w-sm mx-auto">
             احفظ تصميمك الأول من حاسبة الإنتاج وسيتم أرشفته هنا فورياً مع إمكانية تعديله
@@ -114,7 +156,7 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {records.map((rec) => (
+          {displayedRecords.map((rec) => (
             <div
               key={rec.id}
               onClick={() => onSelectRecordToLoad(rec)}
@@ -123,9 +165,16 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
               <div>
                 {/* Header tags */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300/40">
-                    {rec.category}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {rec.productSerialNumber && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100/80 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 font-mono border border-amber-300/50">
+                        #{rec.productSerialNumber}
+                      </span>
+                    )}
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700">
+                      {rec.category}
+                    </span>
+                  </div>
                   <span className="text-[10px] text-stone-400 font-mono">
                     {new Date(rec.updatedAt || rec.createdAt).toLocaleDateString('ar-EG')}
                   </span>
@@ -158,15 +207,26 @@ export const ProductArchive: React.FC<ProductArchiveProps> = ({
                   </div>
                 </div>
 
-                {/* Selling Price */}
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-xs text-stone-500 font-medium">سعر البيع النهائي:</span>
-                  <div className="text-left font-mono">
-                    <span className="text-xl font-black text-amber-700 dark:text-amber-400">
-                      {rec.output.finalSellingPrice}
-                    </span>
-                    <span className="text-xs text-stone-500 mr-1">{profile.currencySymbol}</span>
+                {/* Selling Price & Wholesale */}
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-stone-500 font-medium">سعر القطاعي:</span>
+                    <div className="text-left font-mono">
+                      <span className="text-lg font-black text-amber-700 dark:text-amber-400">
+                        {rec.retailPrice || rec.output.finalSellingPrice}
+                      </span>
+                      <span className="text-xs text-stone-500 mr-1">{profile.currencySymbol}</span>
+                    </div>
                   </div>
+                  {rec.wholesalePrice && (
+                    <div className="flex items-baseline justify-between text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                      <span className="text-[11px] text-stone-400 font-normal">سعر الجملة:</span>
+                      <div className="text-left font-mono">
+                        <span>{rec.wholesalePrice}</span>
+                        <span className="text-[10px] mr-0.5">{profile.currencySymbol}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

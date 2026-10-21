@@ -311,10 +311,18 @@ export const NewSupplierModal: React.FC<{
   onClose: () => void;
   profile: UserProfile;
   onSuccess: () => void;
-}> = ({ isOpen, onClose, profile, onSuccess }) => {
+  initialMode?: 'create_supplier' | 'record_invoice' | 'statement';
+  lockMode?: boolean;
+}> = ({ isOpen, onClose, profile, onSuccess, initialMode = 'create_supplier', lockMode = false }) => {
   if (!isOpen) return null;
 
-  const [mode, setMode] = useState<'create_supplier' | 'record_invoice' | 'statement'>('create_supplier');
+  const [mode, setMode] = useState<'create_supplier' | 'record_invoice' | 'statement'>(initialMode);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
 
   // Supplier profile fields
   const [name, setName] = useState('');
@@ -417,35 +425,47 @@ export const NewSupplierModal: React.FC<{
           <button type="button" onClick={onClose} className="text-stone-400 hover:text-stone-700">
             <X className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-1.5 p-1 bg-stone-100 dark:bg-stone-800 rounded-xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setMode('create_supplier')}
-              className={`px-3 py-1 rounded-lg transition ${
-                mode === 'create_supplier' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
-              }`}
-            >
-              تعريف مورد جديد
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('record_invoice')}
-              className={`px-3 py-1 rounded-lg transition ${
-                mode === 'record_invoice' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
-              }`}
-            >
-              إثبات فاتورة مشتريات
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('statement')}
-              className={`px-3 py-1 rounded-lg transition ${
-                mode === 'statement' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
-              }`}
-            >
-              كشف حساب مورد (طباعة)
-            </button>
-          </div>
+          {lockMode ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-blue-800 dark:text-blue-300">
+                {mode === 'create_supplier'
+                  ? 'تسجيل مورد جديد'
+                  : mode === 'record_invoice'
+                  ? 'إنشاء فاتورة مشتريات مورد'
+                  : 'كشف حساب مورد'}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 p-1 bg-stone-100 dark:bg-stone-800 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setMode('create_supplier')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  mode === 'create_supplier' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
+                }`}
+              >
+                تعريف مورد جديد
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('record_invoice')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  mode === 'record_invoice' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
+                }`}
+              >
+                إثبات فاتورة مشتريات
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('statement')}
+                className={`px-3 py-1 rounded-lg transition ${
+                  mode === 'statement' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-500'
+                }`}
+              >
+                كشف حساب مورد (طباعة)
+              </button>
+            </div>
+          )}
         </div>
 
         {mode === 'create_supplier' ? (

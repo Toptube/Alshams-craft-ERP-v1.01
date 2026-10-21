@@ -3,6 +3,7 @@ import { UserProfile, Gender, getDefaultFamilyNickname } from '../../types';
 import { COUNTRIES_CONFIG, getGenderArtistTitle } from '../../utils/macrameMath';
 import { tenantStorage } from '../../db/dexieDB';
 import { firestoreService } from '../../db/firestoreService';
+import { NumberInput } from '../ui/NumberInput';
 import {
   X,
   Building2,
@@ -56,6 +57,9 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const [countryName, setCountryName] = useState(profile.country || 'جمهورية مصر العربية');
   const [phoneNumber, setPhoneNumber] = useState(profile.phoneNumber || '');
   const [logoUrl, setLogoUrl] = useState(profile.logoUrl || '');
+  const [defaultWholesaleDiscountPercent, setDefaultWholesaleDiscountPercent] = useState<number>(
+    profile.defaultWholesaleDiscountPercent ?? 25
+  );
 
   // Backup Export state
   const [exporting, setExporting] = useState(false);
@@ -173,6 +177,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         currencySymbol: currentCountryConfig.currencySymbol,
         phoneNumber: phoneNumber.trim(),
         logoUrl: logoUrl || undefined,
+        defaultWholesaleDiscountPercent: Number(defaultWholesaleDiscountPercent) || 25,
         socials: {
           facebook: activeSocials.facebook ? socialUrls.facebook.trim() : undefined,
           instagram: activeSocials.instagram ? socialUrls.instagram.trim() : undefined,
@@ -495,6 +500,26 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500 text-left focus:placeholder-transparent"
                   dir="ltr"
                 />
+              </div>
+
+              {/* Wholesale margin discount percent */}
+              <div className="sm:col-span-2 p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/60">
+                <label className="block text-xs font-bold mb-1 text-stone-700 dark:text-stone-300">
+                  نسبة الخصم من هامش الربح لحساب سعر الجملة (%) (افتراضي 25%)
+                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-1.5">
+                  <div className="w-full sm:w-36">
+                    <NumberInput
+                      value={defaultWholesaleDiscountPercent}
+                      onChange={(v) => setDefaultWholesaleDiscountPercent(v)}
+                      placeholder="25"
+                      className="w-full px-3.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-bold font-mono outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <span className="text-[11px] text-stone-500 dark:text-stone-400 leading-relaxed">
+                    * تُخصم هذه النسبة من هامش الربح الصافي فقط عند حساب سعر الجملة مع حماية وضمان تغطية كافة تكاليف الخامات وأجور اليد العاملة.
+                  </span>
+                </div>
               </div>
             </div>
 

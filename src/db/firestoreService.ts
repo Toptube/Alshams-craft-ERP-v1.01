@@ -38,6 +38,7 @@ import {
   ActivityLogItem,
   NotificationItem,
   UnitRecord,
+  SavedProductRecord,
 } from '../types';
 import {
   calculateWeightedAverageCost,
@@ -926,6 +927,30 @@ export const firestoreService = {
   async saveFinishedProduct(workshopId: string, product: FinishedProductItem): Promise<void> {
     const docRef = getDocRef(workshopId, 'products', product.id);
     await setDoc(docRef, { ...product, updatedAt: Date.now() }, { merge: true });
+  },
+
+  /**
+   * توليد رقم متسلسل تلقائي للمنتج باستخدام transaction داخل counters
+   */
+  async getNextProductSerialNumber(workshopId: string): Promise<number> {
+    const counterRef = getDocRef(workshopId, 'counters', 'products');
+    let nextNum = 1;
+    await runTransaction(db, async (t) => {
+      const snap = await t.get(counterRef);
+      if (snap.exists()) {
+        nextNum = (snap.data().current || 0) + 1;
+        t.update(counterRef, { current: nextNum, updatedAt: Date.now() });
+      } else {
+        nextNum = 1;
+        t.set(counterRef, { current: 1, updatedAt: Date.now() });
+      }
+    });
+    return nextNum;
+  },
+
+  async saveSavedProductRecord(workshopId: string, record: SavedProductRecord): Promise<void> {
+    const docRef = getDocRef(workshopId, 'products', record.id);
+    await setDoc(docRef, { ...record, updatedAt: Date.now() }, { merge: true });
   },
 
   async getStockMovements(

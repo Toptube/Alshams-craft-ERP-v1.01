@@ -7,6 +7,7 @@ import {
 } from '../../types';
 import { firestoreService } from '../../db/firestoreService';
 import { NumberInput } from '../ui/NumberInput';
+import { ensureDefaultBasicYarns } from '../../services/materialCalculatorAdapter';
 import {
   Boxes,
   Plus,
@@ -90,7 +91,7 @@ export const MaterialsView: React.FC<MaterialsViewProps> = ({
     setLoading(true);
     try {
       const [mats, unts, sups] = await Promise.all([
-        firestoreService.getRawMaterials(workshop.id),
+        ensureDefaultBasicYarns(workshop.id),
         firestoreService.getUnits(workshop.id),
         firestoreService.getSuppliers(workshop.id),
       ]);

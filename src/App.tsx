@@ -31,6 +31,7 @@ import {
   NewSupplierModal,
   NewEmployeeModal,
 } from './components/modals/CreationModals';
+import { WorkshopCatalog } from './components/catalog/WorkshopCatalog';
 import { tenantStorage } from './db/dexieDB';
 import { firestoreService } from './db/firestoreService';
 import { auth, onAuthStateChanged, signOut } from './lib/firebase';
@@ -48,6 +49,7 @@ import {
   Hammer,
   Truck,
   FileText,
+  BookOpen,
 } from 'lucide-react';
 
 export type AppActiveView =
@@ -62,6 +64,7 @@ export type AppActiveView =
   | 'hr'
   | 'ai_agent'
   | 'archive'
+  | 'catalog'
   | 'reports';
 
 export default function App() {
@@ -104,6 +107,8 @@ export default function App() {
   const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [isNewSupplierModalOpen, setIsNewSupplierModalOpen] = useState(false);
+  const [supplierModalMode, setSupplierModalMode] = useState<'create_supplier' | 'record_invoice' | 'statement'>('create_supplier');
+  const [supplierModalLocked, setSupplierModalLocked] = useState(false);
   const [isNewEmployeeModalOpen, setIsNewEmployeeModalOpen] = useState(false);
 
   // Other Modals
@@ -551,7 +556,21 @@ export default function App() {
               <span>الأرشيف</span>
             </button>
 
-            {/* 11. التقارير */}
+            {/* 11. كتالوج الورشة */}
+            <button
+              type="button"
+              onClick={() => setActiveView('catalog')}
+              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeView === 'catalog'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>كتالوج الورشة</span>
+            </button>
+
+            {/* 12. التقارير */}
             <button
               type="button"
               onClick={() => setActiveView('reports')}
@@ -587,7 +606,22 @@ export default function App() {
               setActiveView('materials');
             }}
             onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
-            onOpenNewSupplierModal={() => setIsNewSupplierModalOpen(true)}
+            onOpenNewSupplierModal={() => {
+              setSupplierModalMode('create_supplier');
+              setSupplierModalLocked(false);
+              setIsNewSupplierModalOpen(true);
+            }}
+            onOpenCreateSupplier={() => {
+              setSupplierModalMode('create_supplier');
+              setSupplierModalLocked(true);
+              setIsNewSupplierModalOpen(true);
+            }}
+            onOpenSupplierInvoice={() => {
+              setSupplierModalMode('record_invoice');
+              setSupplierModalLocked(true);
+              setIsNewSupplierModalOpen(true);
+            }}
+            onNavigateToSales={() => setActiveView('sales')}
             onOpenNewEmployeeModal={() => setIsNewEmployeeModalOpen(true)}
             onNavigateToCalculator={() => setActiveView('calculator')}
           />
@@ -724,6 +758,8 @@ export default function App() {
         onClose={() => setIsNewSupplierModalOpen(false)}
         profile={currentProfile}
         onSuccess={() => {}}
+        initialMode={supplierModalMode}
+        lockMode={supplierModalLocked}
       />
 
       <NewEmployeeModal

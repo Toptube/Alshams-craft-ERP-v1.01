@@ -124,6 +124,13 @@ export const tenantStorage = {
     await db.products.put(record);
   },
 
+  async getNextProductSerialNumber(tenantId: string): Promise<number> {
+    const allProds = await db.products.toArray();
+    const tenantProds = allProds.filter((p) => p.tenantId === tenantId);
+    const maxSerial = tenantProds.reduce((max, p) => Math.max(max, p.productSerialNumber || 0), 0);
+    return maxSerial + 1;
+  },
+
   async deactivateProduct(tenantId: string, id: string, reason: string, userEmail: string): Promise<void> {
     const item = await db.products.get(id);
     if (item && item.tenantId === tenantId) {
