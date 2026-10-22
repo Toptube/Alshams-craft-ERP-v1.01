@@ -1,54 +1,43 @@
 import { auth } from './firebase';
 
 /**
- * الحصول على رمز مصادقة المستخدم الحالي مع إمكانية التحديث الإجباري
+ * دالة استدعاء مشتركة للمسارات الخلفية /api/*
+ * تُضيف ترويسة Authorization: Bearer <ID_TOKEN> تلقائياً
+ * عند الرد 401، تجدد الرمز فورياً بـ getIdToken(true) وتعيد المحاولة لمرة واحدة فقط
+ * إذا لم يكن هناك مستخدم مسجل ترفض الطلب برسالة "سجّل دخولك الأول"
  */
-export async function getCurrentUserIdToken(forceRefresh = false): Promise<string | null> {
-  let user = auth.currentUser;
-  if (!user) {
-    // انتظار قصير في حال لم تكتمل تهيئة onAuthStateChanged بعد
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    user = auth.currentUser;
-  }
-  if (!user) return null;
-  return await user.getIdToken(forceRefresh);
-}
-
-/**
- * دالة جلب موحدة ومحمية لجميع طلبات /api/*
- * تُرفق تلقائياً ترويسة Authorization: Bearer <رمز_المستخدم>
- * وعند استقبال 401 تجدد الرمز بـ getIdToken(true) وتعيد المحاولة مرة واحدة فقط
- */
-export async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
-  const token = await getCurrentUserIdToken(false);
-  if (!token) {
-    throw new Error('سجّل دخولك الأول للوصول إلى خدمات المساعد الذكي صقر الشمساوية.');
+export async function authedFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {}
+): Promise<Response> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('سجّل دخولك الأول');
   }
 
-  const headers = new Headers(init?.headers);
+  let token = await currentUser.getIdToken();
+  const headers = new Headers(init.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
-  if (!headers.has('Content-Type') && !(init?.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
-  }
 
-  let res = await fetch(url, {
+  let response = await fetch(input, {
     ...init,
     headers,
   });
 
-  // إذا كانت النتيجة 401، نحاول تجديد الرمز وإعادة المحاولة لمرة واحدة فقط
-  if (res.status === 401 && auth.currentUser) {
+  // إذا كانت الاستجابة 401، نجدد الرمز ونجرب مرة واحدة إضافية
+  if (response.status === 401) {
     try {
-      const refreshedToken = await auth.currentUser.getIdToken(true);
-      headers.set('Authorization', `Bearer ${refreshedToken}`);
-      res = await fetch(url, {
+      token = await currentUser.getIdToken(true);
+      const retryHeaders = new Headers(init.headers || {});
+      retryHeaders.set('Authorization', `Bearer ${token}`);
+      response = await fetch(input, {
         ...init,
-        headers,
+        headers: retryHeaders,
       });
     } catch (refreshErr) {
-      console.error('Failed to refresh Firebase ID token on 401 retry:', refreshErr);
+      console.error('[authedFetch] Failed to force-refresh ID token on 401:', refreshErr);
     }
   }
 
-  return res;
+  return response;
 }

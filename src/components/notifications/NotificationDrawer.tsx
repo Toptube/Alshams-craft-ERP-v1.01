@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NotificationItem, UserProfile } from '../../types';
 import { tenantStorage } from '../../db/dexieDB';
+import { playAlertSound } from '../../lib/sounds';
 import {
   Bell,
   X,
@@ -36,6 +37,12 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   onNavigateToOrder,
   onNavigateToInventory,
 }) => {
+  useEffect(() => {
+    if (isOpen) {
+      playAlertSound();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const [selectedOrderIdForStatus, setSelectedOrderIdForStatus] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlShamsBrandLogo, ArtisanAvatar } from '../brand/BrandAssets';
-import { UserProfile } from '../../types';
+import { UserProfile, isUserAdmin } from '../../types';
 import { getGenderGreeting } from '../../utils/macrameMath';
 import {
   X,
@@ -26,6 +26,9 @@ import {
   Layers,
   Settings,
   HelpCircle,
+  Home,
+  MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarDrawerProps {
@@ -40,6 +43,7 @@ interface SidebarDrawerProps {
   onOpenCraftsSelector: () => void;
   onOpenUserGuide: (sectionId?: string) => void;
   onOpenCloudMigration: () => void;
+  onOpenSupport?: () => void;
   onToggleDarkMode: () => void;
   isDarkMode: boolean;
   onLogout: () => void;
@@ -57,6 +61,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onOpenCraftsSelector,
   onOpenUserGuide,
   onOpenCloudMigration,
+  onOpenSupport,
   onToggleDarkMode,
   isDarkMode,
   onLogout,
@@ -66,6 +71,12 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   const greeting = getGenderGreeting(profile.gender, profile.artistName);
 
   const mainModules = [
+    {
+      id: 'create_center',
+      label: 'الرئيسية ومركز العمليات',
+      sublabel: 'شبكة البطاقات السريعة وملخص الورشة',
+      icon: Home,
+    },
     {
       id: 'calculator',
       label: 'حاسبة تكاليف المنتج',
@@ -125,6 +136,12 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       label: 'التقارير المالية وقفل الشهر',
       sublabel: 'الأرباح والخسائر، أرصدة العملاء، والقفل',
       icon: BarChart3,
+    },
+    {
+      id: 'catalog',
+      label: 'كتالوج الورشة',
+      sublabel: 'جدول المنتجات، الأسعار، وتصدير PDF',
+      icon: BookOpen,
     },
     {
       id: 'archive',
@@ -237,6 +254,39 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
 
         {/* Modules Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-1.5">
+          {/* Admin Dashboard (Only shown if user has admin privileges) */}
+          {isUserAdmin(profile) && (
+            <div className="mb-2 p-1 rounded-2xl bg-gradient-to-r from-purple-500/10 via-amber-500/10 to-purple-500/10 border border-purple-500/30">
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectView('admin');
+                  onClose();
+                }}
+                className={`w-full p-2.5 rounded-xl flex items-center justify-between text-right transition cursor-pointer ${
+                  activeView === 'admin'
+                    ? 'bg-purple-700 text-white shadow-md shadow-purple-700/30 font-black'
+                    : 'bg-white dark:bg-stone-800 text-purple-900 dark:text-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center">
+                    <ShieldCheck size={16} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black block">لوحة تحكم الإدارة</span>
+                    <span className="text-[9px] text-stone-400 dark:text-stone-400 block">
+                      إدارة الورش، التجميد، والحذف
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold font-mono">
+                  Admin
+                </span>
+              </button>
+            </div>
+          )}
+
           {mainModules.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
@@ -289,17 +339,29 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
 
         {/* Utilities: Guide + Migration + Logout */}
         <div className="p-3 border-t border-stone-100 dark:border-stone-800 space-y-2 bg-stone-50 dark:bg-stone-900/60">
-          <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+          <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
             <button
               type="button"
               onClick={() => {
                 onOpenUserGuide();
                 onClose();
               }}
-              className="py-2 px-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              className="py-2 px-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 flex flex-col items-center justify-center gap-1 cursor-pointer shadow-2xs text-[10px]"
             >
               <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-              <span>دليل الاستخدام</span>
+              <span>دليل الورشة</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenSupport) onOpenSupport();
+                onClose();
+              }}
+              className="py-2 px-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 flex flex-col items-center justify-center gap-1 cursor-pointer shadow-2xs text-[10px]"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>الدعم والشكاوى</span>
             </button>
 
             <button
@@ -308,7 +370,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
                 onOpenCloudMigration();
                 onClose();
               }}
-              className="py-2 px-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              className="py-2 px-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-100 flex flex-col items-center justify-center gap-1 cursor-pointer shadow-2xs text-[10px]"
             >
               <CloudUpload className="w-3.5 h-3.5 text-blue-600" />
               <span>رفع للسحابة</span>

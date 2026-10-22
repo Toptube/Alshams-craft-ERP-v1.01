@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { UserProfile, getDefaultFamilyNickname } from '../../types';
 import { Sparkles, Sun, Heart, ArrowLeft } from 'lucide-react';
+import { playWelcomeSound } from '../../lib/sounds';
 
 interface FamilyWelcomeModalProps {
   isOpen: boolean;
@@ -15,6 +16,12 @@ export const FamilyWelcomeModal: React.FC<FamilyWelcomeModalProps> = ({
   profile,
   type,
 }) => {
+  useEffect(() => {
+    if (isOpen) {
+      playWelcomeSound();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isFemale = profile.gender === 'female';

@@ -27,6 +27,7 @@ import {
   SUB_CRAFTS_REGISTRY,
   MainSectionId,
 } from '../../registry/craftsRegistry';
+import { playSuccessSound, playErrorSound } from '../../lib/sounds';
 import {
   Calculator,
   Pencil,
@@ -705,11 +706,13 @@ export const ProductionCalculator: React.FC<ProductionCalculatorProps> = ({
         });
       }
 
+      playSuccessSound();
       setSaveStatus(`تم حفظ وتوثيق المنتج برقم متسلسل #${serialNum} (${productCode}) بنجاح!`);
       setTimeout(() => setSaveStatus(''), 3000);
 
       if (onSavedSuccess) onSavedSuccess();
     } catch (err: any) {
+      playErrorSound();
       setSaveStatus('تعذر الحفظ: ' + (err.message || 'خطأ غير معروف'));
     }
   };

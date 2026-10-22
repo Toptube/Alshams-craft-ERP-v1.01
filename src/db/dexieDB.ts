@@ -91,6 +91,14 @@ export const tenantStorage = {
     await db.profiles.put(profile);
   },
 
+  async getAllProfiles(): Promise<UserProfile[]> {
+    return db.profiles.toArray();
+  },
+
+  async deleteProfile(id: string): Promise<void> {
+    await db.profiles.delete(id);
+  },
+
   // Products Archive (Mutate / Overwrite when existing ID is given)
   async getProducts(tenantId: string, categoryFilter?: string, searchQuery?: string): Promise<SavedProductRecord[]> {
     let collection = db.products.where('tenantId').equals(tenantId);

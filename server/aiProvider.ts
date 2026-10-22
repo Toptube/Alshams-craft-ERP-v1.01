@@ -60,9 +60,11 @@ export class GeminiAIProvider {
     }
 
     const { imageBase64, mimeType, artistNotes } = input;
-    const activeCrafts = Array.isArray(input.activeCrafts)
-      ? input.activeCrafts
-      : [input.activeCrafts].filter(Boolean);
+    const activeCrafts: string[] = Array.isArray(input.activeCrafts)
+      ? input.activeCrafts.filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+      : typeof input.activeCrafts === 'string'
+      ? [(input.activeCrafts as string).trim()].filter(Boolean)
+      : [];
 
     // Normalize base64 string
     let cleanBase64 = imageBase64;
@@ -129,8 +131,9 @@ ${craftsContextText}
     ];
 
     let response;
+    let usedSearch = false;
     try {
-      // First attempt with Google Search grounding
+      // 6) تفعيل البحث الحقيقي في Gemini مع googleSearch داخل try/catch
       response = await this.ai.models.generateContent({
         model: this.defaultModel,
         contents: { parts },
@@ -138,6 +141,7 @@ ${craftsContextText}
           tools: [{ googleSearch: {} }],
         },
       });
+      usedSearch = true;
     } catch (searchError: any) {
       console.warn('Vision analysis with googleSearch failed, retrying without search tools:', searchError?.message);
       try {
@@ -171,6 +175,30 @@ ${craftsContextText}
     const parsed = JSON.parse(jsonMatch[0]);
     const hours = Number(parsed.estimatedHours) || 5;
     parsed.estimatedLaborWage = Math.round(hours * 30);
+
+    // إذا لم يعمل البحث، نوضح أن الأسعار تقدير تقريبي وليست بحث سوق مؤكد
+    if (!usedSearch) {
+      parsed.notesForCalculator =
+        (parsed.notesForCalculator ? parsed.notesForCalculator + '\n' : '') +
+        '(ملاحظة: أسعار السوق تقدير تقريبي وليست بحث سوق مؤكد)';
+    }
+
+    // استخراج مصادر البحث إن وجدت
+    const candidate = response?.candidates?.[0];
+    const grounding = candidate?.groundingMetadata;
+    const searchSources: Array<{ title: string; url: string }> = [];
+    if (grounding?.groundingChunks) {
+      for (const chunk of grounding.groundingChunks) {
+        if (chunk.web?.uri) {
+          searchSources.push({
+            title: chunk.web.title || chunk.web.uri,
+            url: chunk.web.uri,
+          });
+        }
+      }
+    }
+    parsed.sources = searchSources;
+
     return parsed;
   }
 
@@ -185,29 +213,29 @@ ${craftsContextText}
     const { message, actionChip, chatHistory, currentContext } = input;
     const currency = currentContext?.currency || 'جنيه';
 
+    // 4) جودة الرد: صقر يرد على سؤال المستخدم الفعلي أولاً وبشكل مباشر ومنطقي
     const systemInstruction = `أنت "صقر الشمساوية AI" - المستشار الذكي والرفيق الفني لمنصة الشمس كرافت الحرفية (AlSHams Craft ERP).
 أنت مستشار حرفي وهندسي خبير في الصناعات والمهارات والفنون اليدوية (المكرمية، الكروشيه، التطريز، الرزن، الخزف والصلصال، الأخشاب، إكسسوارات الهاند ميد).
 
-القواعد المهنية الصارمة:
-1. الإجابة المباشرة أولاً: ابدأ ردك مباشرة وبشكل منطقي ومحدد بالإجابة عن سؤال المستخدم الفعلي، بلا مقدمات إنشائية مكررة أو إعادة صياغة للسؤال.
-2. التفاعل الموضوعي الحرفي: تفاعل مع الحرفي كخبير أمين، وناقشه بموضوعية وبحث متقن مبني على أصول الصنعة ودراسة السوق الحقيقية.
-3. الاعتماد على سياق الورشة: اعتمد على بيانات الورشة المرفقة (اسم الورشة، العملة [${currency}]، الحرفة، الخامات المسجلة وأسعارها، ومصنعية اليد).
-4. الأمانة والشفافية وعدم اختراع الأرقام:
-   - لا تخترع أسعاراً أو أرقاماً غير مؤكدة من وحي الخيال.
-   - إذا استعنت ببحث السوق فاذكر الأسعار المرجعية الحقيقية.
-   - إذا كان الرقم تقديراً بدون مصدر محدد، اذكر صراحة: "هذا السعر هو تقدير تقريبي من صقر الشمساويه لمساعدتك في ايجاد السعر المناسب".
-   - إذا نقصت معلومة أساسية لإكمال الإجابة بدقة، أجب عن المتاح واسأل سؤالاً توضيحياً واحداً محدداً ومباشراً في نهاية الرد.
-5. البساطة والاختصار مع الدقة: قدم نتائج واضحة، مبسطة، ومختصرة بخطوات عملية يسهل على الحرفي تطبيقها فوراً في ورشته.
-6. اللغة والخصوصية: تحدث باللغة العربية الراقية والودودة دون ذكر أي مصطلحات برمجية أو تقنية داخلية مثل "Gemini" أو أسماء نماذج أو أكواد.
+التعليمات الصارمة لجودة الرد:
+1. الإجابة عن سؤال المستخدم الفعلي أولاً وبشكل مباشر ومنطقي: ابدأ ردك مباشرة وبلا أي مقدمات إنشائية أو تكرار للسؤال، بتقديم الإجابة الدقيقة والمباشرة عن صلب ما سأل عنه الحرفي.
+2. الاعتماد على سياق الورشة المرسل: اعتمد بالكامل على بيانات الورشة المرفقة أدناه (اسم الورشة، العملة [${currency}]، الحرفة، الخامات المسجلة وأسعارها) لربط إجابتك بالواقع العملي للورشة.
+3. عدم اختراع أرقام أو معلومات:
+   - لا تخترع أرقاماً أو أسعاراً غير مؤكدة من وحي الخيال مطلقاً.
+   - إذا استعنت ببحث السوق المتاح واحتوى الرد على مصادر حقيقية، فاذكر الأسعار المرجعية الحقيقية بدقة.
+   - إذا كان الرقم تقديراً بدون بحث سوق مؤكد، فاذكر صراحة وبوضوح: "هذا السعر هو تقدير تقريبي من صقر الشمساويه لمساعدتك في ايجاد السعر المناسب وليست بحث سوق مؤكد".
+   - إن نقصت أي معلومة أساسية لإتمام الإجابة أو الحساب بدقة، أجب عما هو متاح واسأل سؤالاً توضيحياً واحداً محدداً ومباشراً في نهاية ردك.
+4. عدم إرسال رد فارغ: إن لم تصل لمعلومة واضحة اعرض رسالة توضيحية محددة. تحدث دائماً باللغة العربية الراقية والودودة دون ذكر أي مصطلحات برمجية داخلية.
 
 سياق ورشة الحرفي الحالي:
 ${JSON.stringify(currentContext, null, 2)}`;
 
-    // تحويل سجل المحادثة واستخراج النصوص الصالحة
+    // 3) سجل المحادثة: حوّل رسائل الواجهة، سواء بصيغة {sender,text} أو {role,parts}، إلى صيغة النموذج {role:'user'|'model', parts:[{text}]}، واحذف الرسائل الفارغة، واحذف أي رسائل 'model' في البداية، وخذ آخر 12 رسالة فقط.
     const rawHistory = Array.isArray(chatHistory) ? chatHistory : [];
     const mappedHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
 
     for (const m of (rawHistory as any[])) {
+      if (!m) continue;
       const role: 'user' | 'model' =
         m.role === 'model' || m.sender === 'falcon' || m.sender === 'model' || m.sender === 'assistant'
           ? 'model'
@@ -222,6 +250,7 @@ ${JSON.stringify(currentContext, null, 2)}`;
         text = m.message.trim();
       }
 
+      // حذف الرسائل الفارغة
       if (text) {
         mappedHistory.push({
           role,
@@ -230,12 +259,12 @@ ${JSON.stringify(currentContext, null, 2)}`;
       }
     }
 
-    // حذف أي رسائل model في البداية لضمان بدء المحادثة بـ user
+    // حذف أي رسائل 'model' في البداية
     while (mappedHistory.length > 0 && mappedHistory[0].role === 'model') {
       mappedHistory.shift();
     }
 
-    // أخذ آخر 12 رسالة فقط كما هو مطلوب
+    // خذ آخر 12 رسالة فقط
     const recentHistory = mappedHistory.slice(-12);
 
     const contents: any[] = [...recentHistory];
@@ -254,7 +283,7 @@ ${JSON.stringify(currentContext, null, 2)}`;
     let usedSearch = false;
     const searchSources: Array<{ title: string; url: string }> = [];
 
-    // محاولة الاستدعاء مع أدوات بحث جوجل أولاً
+    // 6) تفعيل البحث الحقيقي في Gemini (tools: [{ googleSearch: {} }]) في الدردشة داخل try/catch
     try {
       response = await this.ai.models.generateContent({
         model: this.defaultModel,
@@ -287,7 +316,7 @@ ${JSON.stringify(currentContext, null, 2)}`;
       }
     }
 
-    // استخراج مصادر البحث إن وجدت
+    // استخراج مصادر البحث إن وُجدت
     const candidate = response?.candidates?.[0];
     const grounding = candidate?.groundingMetadata;
     if (grounding?.groundingChunks) {
@@ -303,10 +332,10 @@ ${JSON.stringify(currentContext, null, 2)}`;
 
     let replyText = response?.text?.trim() || '';
     if (!replyText) {
-      replyText = 'عذراً يا فنان، لم أتمكن من صياغة إجابة واضحة لهذه النقطة. يرجى توضيح استفسارك أو إعادة طرح السؤال.';
+      replyText = 'عذراً يا فنان، تعذر استخراج رد واضح على سؤالك حالياً، يرجى إعادة المحاولة أو توضيح السؤال.';
     }
 
-    // إذا لم تتوفر مصادر بحث وورد ذكر أسعار، أضف التنبيه التوضيحي الصريح
+    // إن لم يعمل البحث أعد الطلب بدونه واجعل الرد يكتب أن الأسعار "تقدير تقريبي وليست بحث سوق مؤكد". لا تعرض أرقام سوق كأنها حقيقية دون مصدر.
     if (!usedSearch || searchSources.length === 0) {
       const mentionsPrice =
         replyText.includes('سعر') ||
@@ -314,8 +343,8 @@ ${JSON.stringify(currentContext, null, 2)}`;
         replyText.includes('مصنعية') ||
         replyText.includes(currency);
 
-      if (mentionsPrice && !replyText.includes('تقدير تقريبي من صقر الشمساويه')) {
-        replyText += '\n\n*(ملاحظة: الأسعار المذكورة أعلاه هي تقدير تقريبي من صقر الشمساويه لمساعدتك في ايجاد السعر المناسب)*';
+      if (mentionsPrice && !replyText.includes('تقدير تقريبي وليست بحث سوق مؤكد')) {
+        replyText += '\n\n*(ملاحظة: الأسعار المذكورة أعلاه هي تقدير تقريبي وليست بحث سوق مؤكد)*';
       }
     }
 

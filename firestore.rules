@@ -32,21 +32,22 @@ service cloud.firestore {
     }
 
     function isPlatformAdmin() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'HMB.top.tube@gmail.com' ||
+        request.auth.token.email == 'hmb.top.tube@gmail.com'
+      );
     }
 
     // 1. Multi-tenant Workshops Isolation (الورش المستأجرة وعزل البيانات الكامل)
     match /workshops/{workshopId} {
-      // Direct workshop document read/write (owner or member)
-      allow read, write: if isWorkshopMember(workshopId);
+      // Direct workshop document read/write (owner or member or platform admin)
+      allow read, write: if isWorkshopMember(workshopId) || isPlatformAdmin();
+      allow list: if isPlatformAdmin();
 
-      // All sub-collections: products, materials, warehouses, stockMovements, workOrders,
-      // suppliers, supplierInvoices, customers, invoices, returns, treasuries,
-      // treasuryTransactions, expenses, revenues, employees, payrolls, payslips,
-      // periods, activityLogs, counters, stats, aiFeedback, members
+      // All sub-collections
       match /{allSubcollections=**} {
-        allow read, write: if isWorkshopMember(workshopId);
+        allow read, write: if isWorkshopMember(workshopId) || isPlatformAdmin();
       }
     }
 

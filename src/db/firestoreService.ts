@@ -73,6 +73,36 @@ export const firestoreService = {
     return snap.data() as WorkshopProfile;
   },
 
+  async getAllWorkshops(): Promise<WorkshopProfile[]> {
+    const colRef = collection(db, 'workshops');
+    const snap = await getDocs(colRef);
+    return snap.docs.map((d) => d.data() as WorkshopProfile);
+  },
+
+  async updateWorkshop(workshopId: string, updates: Partial<WorkshopProfile>): Promise<void> {
+    const docRef = doc(db, 'workshops', workshopId);
+    await updateDoc(docRef, { ...updates, updatedAt: Date.now() });
+  },
+
+  async deleteWorkshop(workshopId: string): Promise<void> {
+    const docRef = doc(db, 'workshops', workshopId);
+    await deleteDoc(docRef);
+  },
+
+  async setWorkshopFrozenStatus(
+    workshopId: string,
+    isFrozen: boolean,
+    reason?: string
+  ): Promise<void> {
+    const docRef = doc(db, 'workshops', workshopId);
+    await updateDoc(docRef, {
+      isFrozen,
+      frozenReason: reason || (isFrozen ? 'تجميد بواسطة الإدارة' : ''),
+      frozenAt: isFrozen ? Date.now() : null,
+      updatedAt: Date.now(),
+    });
+  },
+
   async setWorkshop(profile: WorkshopProfile): Promise<void> {
     const docRef = doc(db, 'workshops', profile.id);
     await setDoc(

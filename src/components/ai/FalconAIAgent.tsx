@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { FalconMascotAvatar } from '../brand/BrandAssets';
 import { UserProfile, CraftCategory, AIVisionAnalysis, ChatMessage } from '../../types';
 import { tenantStorage } from '../../db/dexieDB';
 import { getGenderArtistTitle } from '../../utils/macrameMath';
+import { authedFetch } from '../../lib/apiClient';
 import {
   Sparkles,
   Camera,
@@ -18,6 +19,7 @@ import {
   CheckCircle,
   Lightbulb,
   Cpu,
+  ExternalLink,
 } from 'lucide-react';
 
 interface FalconAIAgentProps {
@@ -26,6 +28,26 @@ interface FalconAIAgentProps {
   onApplyCategoryFromAI: (category: CraftCategory) => void;
   onApplyEstimatedLaborWage: (wage: number, hours: number) => void;
   onTransferNotesToCalculator: (notes: string) => void;
+}
+
+/**
+ * 5) خريطة الأخطاء بالعربية حسب رمز الحالة:
+ * 401 (سجّل دخولك)، 429 (انتهى الحد اليومي)، 503 (خدمة الذكاء الاصطناعي غير مفعّلة حالياً)، 502 (تعذر التحليل، حاول مرة أخرى)
+ */
+function getArabicAiError(status: number, defaultMessage?: string): string {
+  if (status === 401) {
+    return 'سجّل دخولك الأول للوصول إلى استشارات وتحليلات صقر الشمساوية AI.';
+  }
+  if (status === 429) {
+    return 'انتهى الحد اليومي (20 استشارة في اليوم) للمساعد الذكي. يتجدد رصيدك تلقائياً غداً.';
+  }
+  if (status === 503) {
+    return 'خدمة الذكاء الاصطناعي غير مفعّلة حالياً على الخادم.';
+  }
+  if (status === 502) {
+    return 'تعذر التحليل، حاول مرة أخرى.';
+  }
+  return defaultMessage || 'تعذر معالجة الطلب، حاول مرة أخرى.';
 }
 
 export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
@@ -53,6 +75,8 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
   const [visionAnalysis, setVisionAnalysis] = useState<AIVisionAnalysis | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [transferredNotice, setTransferredNotice] = useState(false);
+  // 5) عرض عدد الاستشارات المتبقية اليوم
+  const [dailyRemaining, setDailyRemaining] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -63,7 +87,26 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, visionAnalysis]);
+  }, [messages, visionAnalysis, isSending, isAnalyzingImage]);
+
+  // استعلام رصيد الاستشارات المتبقية اليوم عند الفتح
+  const loadDailyUsage = useCallback(async () => {
+    try {
+      const res = await authedFetch('/api/ai/usage');
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.remaining === 'number') {
+          setDailyRemaining(data.remaining);
+        }
+      }
+    } catch (err) {
+      // مستخدم غير مسجل بعد أو غير متاح
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDailyUsage();
+  }, [loadDailyUsage]);
 
   // Action chips
   const actionChips = [
@@ -73,7 +116,7 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
     'توقع الأبعاد والتكلفة والمصنعية',
   ];
 
-  // Client-side image compression to optimize speed & guarantee Gemini vision compatibility
+  // 5) ضغط الصورة في الواجهة قبل الإرسال (أقصى بُعد 1280px، JPEG جودة 0.8)
   const compressImageForAI = (file: File): Promise<{ base64: string; mimeType: string }> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -97,15 +140,16 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            resolve({ base64: rawResult, mimeType: file.type || 'image/jpeg' });
+            resolve({ base64: rawResult, mimeType: 'image/jpeg' });
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          // ضبط الجودة الصارم على 0.8 بصيغة JPEG
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
           resolve({ base64: compressed, mimeType: 'image/jpeg' });
         };
         img.onerror = () => {
-          resolve({ base64: rawResult, mimeType: file.type || 'image/jpeg' });
+          resolve({ base64: rawResult, mimeType: 'image/jpeg' });
         };
         img.src = rawResult;
       };
@@ -116,7 +160,7 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
     });
   };
 
-  // Handle Vision Image Upload & Real AI / Vision Processing
+  // 1) و 5) معالجة تحليل الصورة باستخدام authedFetch وعرض الأخطاء العربية
   const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,7 +172,7 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
 
       setImagePreview(base64);
 
-      // Add user message with thumbnail
+      // إضافة رسالة المستخدم
       setMessages((prev) => [
         ...prev,
         {
@@ -139,23 +183,29 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
         },
       ]);
 
-      const res = await fetch('/api/analyze-vision', {
+      const res = await authedFetch('/api/analyze-vision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: base64,
           mimeType: mimeType || 'image/jpeg',
           artistNotes: inputPrompt || '',
+          activeCrafts: Array.isArray(profile.selectedCrafts) ? profile.selectedCrafts : [],
         }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || errData.detail || 'فشل اتصال الرؤية الحاسوبية');
+        const errMsg = getArabicAiError(res.status, errData.error || errData.detail);
+        throw new Error(errMsg);
       }
 
       const data: AIVisionAnalysis = await res.json();
       setVisionAnalysis(data);
+
+      if (typeof (data as any).dailyAiRemaining === 'number') {
+        setDailyRemaining((data as any).dailyAiRemaining);
+      }
 
       // 1. Shift category immediately
       if (data.detectedCategory) {
@@ -182,16 +232,18 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
 راجعي أدناه الباترون التخطيطي التفاعلي والمصفوفة التنافسية!`,
           timestamp: Date.now(),
           metadata: data,
+          sources: (data as any).sources || [],
         },
       ]);
     } catch (err: any) {
       console.error('AI Vision error:', err);
+      const isLoginErr = err?.message?.includes('سجّل دخولك');
       setMessages((prev) => [
         ...prev,
         {
           id: 'err_' + Date.now(),
           sender: 'falcon',
-          text: `⚠️ ${err.message || 'عذراً يا فنان، تعذر معالجة الصورة حالياً.'}`,
+          text: `⚠️ ${isLoginErr ? 'سجّل دخولك الأول للوصول إلى تحليلات صقر الشمساوية AI.' : (err.message || 'تعذر التحليل، حاول مرة أخرى.')}`,
           timestamp: Date.now(),
         },
       ]);
@@ -201,7 +253,7 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
     }
   };
 
-  // Send Chat message
+  // 1) و 4) و 6) إرسال رسالة الشات مع authedFetch وتحديث الرصيد والمصادر
   const handleSendMessage = async (customText?: string, chip?: string) => {
     const textToSend = (customText || inputPrompt).trim();
     if (!textToSend && !chip) return;
@@ -219,18 +271,18 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
     setIsSending(true);
 
     try {
-      // Gather local knowledge base overrides for learning
+      // استخراج المعارف المحلية لتخصيص سياق الورشة
       const localOverrides = await tenantStorage.getArtisanOverrides(
         profile.tenantId || profile.workshopId || profile.id || ''
       );
 
-      const res = await fetch('/api/chat-agent', {
+      const res = await authedFetch('/api/chat-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend,
           actionChip: chip || null,
-          chatHistory: messages.slice(-6),
+          chatHistory: messages.slice(-12),
           currentContext: {
             artistName: profile.artistName,
             brandName: profile.brandName,
@@ -244,26 +296,33 @@ export const FalconAIAgent: React.FC<FalconAIAgentProps> = ({
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || errData.detail || 'فشل استجابة المساعد الذكي');
+        const errMsg = getArabicAiError(res.status, errData.error || errData.detail);
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
+      if (typeof data.dailyAiRemaining === 'number') {
+        setDailyRemaining(data.dailyAiRemaining);
+      }
+
       setMessages((prev) => [
         ...prev,
         {
           id: 'falcon_' + Date.now(),
           sender: 'falcon',
-          text: data.reply,
+          text: data.reply || 'عذراً يا فنان، تعذر استخراج رد واضح على سؤالك حالياً، يرجى إعادة المحاولة.',
           timestamp: Date.now(),
+          sources: data.sources || [],
         },
       ]);
     } catch (err: any) {
+      const isLoginErr = err?.message?.includes('سجّل دخولك');
       setMessages((prev) => [
         ...prev,
         {
           id: 'err_' + Date.now(),
           sender: 'falcon',
-          text: `⚠️ ${err.message || 'تعذر معالجة الرد حالياً.'}`,
+          text: `⚠️ ${isLoginErr ? 'سجّل دخولك الأول للتواصل مع صقر الشمساوية AI.' : (err.message || 'تعذر معالجة الرد حالياً، حاول مرة أخرى.')}`,
           timestamp: Date.now(),
         },
       ]);
@@ -311,14 +370,22 @@ ${(visionAnalysis.productionGuide || []).join('\n')}`;
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition cursor-pointer"
-        >
-          <Camera className="w-4 h-4" />
-          <span className="hidden sm:inline">تحليل صورة موديل</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {dailyRemaining !== null && (
+            <div className="hidden xs:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-500/30 text-xs font-bold font-mono">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>متبقي اليوم: {dailyRemaining} / 20</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-950/40 transition cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
+            <span className="hidden sm:inline">تحليل صورة موديل</span>
+          </button>
+        </div>
         <input
           type="file"
           ref={fileInputRef}
@@ -353,6 +420,30 @@ ${(visionAnalysis.productionGuide || []).join('\n')}`;
               }`}
             >
               <div className="whitespace-pre-wrap">{msg.text}</div>
+
+              {/* مصادر بحث السوق إن وُجدت */}
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="mt-2.5 pt-2 border-t border-stone-200/80 dark:border-stone-700/80 text-right">
+                  <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1">
+                    <ExternalLink className="w-3 h-3" />
+                    <span>المصادر المعتمدة لبحث السوق:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {msg.sources.map((s, idx) => (
+                      <a
+                        key={idx}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] px-2 py-0.5 rounded-lg bg-stone-100 dark:bg-stone-900/80 text-stone-700 dark:text-stone-300 hover:text-amber-600 dark:hover:text-amber-400 border border-stone-200 dark:border-stone-700/80 transition flex items-center gap-1"
+                      >
+                        <span className="truncate max-w-[200px]">{s.title || s.url}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <span
                 className={`block text-[9px] mt-1.5 font-mono ${
                   msg.sender === 'user' ? 'text-amber-100' : 'text-stone-400'
@@ -366,6 +457,21 @@ ${(visionAnalysis.productionGuide || []).join('\n')}`;
             </div>
           </div>
         ))}
+
+        {/* 4) مؤشر "صقر بيكتب..." أثناء الانتظار */}
+        {isSending && (
+          <div className="flex items-start gap-3 text-right">
+            <FalconMascotAvatar size="sm" statusDot={false} />
+            <div className="p-3 rounded-2xl bg-white dark:bg-stone-800 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-2 shadow-sm rounded-tr-none">
+              <span className="font-bold">صقر بيكتب...</span>
+              <span className="inline-flex gap-1 mr-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </span>
+            </div>
+          </div>
+        )}
 
         {isAnalyzingImage && (
           <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center gap-3 animate-pulse">
@@ -437,6 +543,28 @@ ${(visionAnalysis.productionGuide || []).join('\n')}`;
                   </span>
                 </div>
               </div>
+
+              {/* مصادر أسعار السوق المرجعية من بحث الويب إن وُجدت */}
+              {visionAnalysis.sources && visionAnalysis.sources.length > 0 && (
+                <div className="pt-2 border-t border-stone-100 dark:border-stone-700/50 text-right">
+                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 block mb-1">
+                    المصادر المرجعية المستخرجة من بحث السوق:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {visionAnalysis.sources.map((src: any, idx: number) => (
+                      <a
+                        key={idx}
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] px-2 py-0.5 rounded-lg bg-stone-100 dark:bg-stone-900/80 text-stone-700 dark:text-stone-300 hover:text-amber-600 dark:hover:text-amber-400 border border-stone-200 dark:border-stone-700/80 transition flex items-center gap-1"
+                      >
+                        <span className="truncate max-w-[200px]">{src.title || src.url}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Stitch Pattern Catalog & Production Guide */}

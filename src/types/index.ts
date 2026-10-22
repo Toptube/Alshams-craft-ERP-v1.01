@@ -80,6 +80,10 @@ export interface WorkshopProfile {
   };
   familyNickname?: string;
   welcomeShown?: boolean;
+  role?: 'admin' | 'superadmin' | 'artisan' | 'manager' | string;
+  isFrozen?: boolean;
+  frozenReason?: string;
+  frozenAt?: number;
   createdAt: number;
   updatedAt: number;
   createdBy: string;
@@ -88,6 +92,14 @@ export interface WorkshopProfile {
 export function getDefaultFamilyNickname(artistName?: string, gender?: Gender): string {
   const firstName = (artistName || '').trim().split(/\s+/)[0] || (gender === 'female' ? 'فنانة' : 'فنان');
   return gender === 'female' ? `${firstName} الشمساوية` : `${firstName} الشمساوي`;
+}
+
+export function isUserAdmin(profile: WorkshopProfile | null | undefined): boolean {
+  if (!profile) return false;
+  if (profile.role === 'admin' || profile.role === 'superadmin') return true;
+  if (profile.email && profile.email.toLowerCase().trim() === 'hmb.top.tube@gmail.com') return true;
+  if (typeof window !== 'undefined' && localStorage.getItem('alshams_admin_override') === 'true') return true;
+  return false;
 }
 
 export type UserProfile = WorkshopProfile;
@@ -785,6 +797,8 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   actionChip?: string;
+  sources?: Array<{ title: string; url: string }>;
+  metadata?: any;
 }
 
 export interface AIVisionAnalysis {

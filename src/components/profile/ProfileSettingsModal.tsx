@@ -26,7 +26,10 @@ import {
   Database,
   Heart,
   Sparkles,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
+import { isSoundEnabled, toggleSound, playSuccessSound, playErrorSound } from '../../lib/sounds';
 
 interface ProfileSettingsModalProps {
   isOpen: boolean;
@@ -88,6 +91,14 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [successNotice, setSuccessNotice] = useState(false);
+
+  // Sound preference state
+  const [soundActive, setSoundActive] = useState<boolean>(() => isSoundEnabled());
+
+  const handleToggleSound = () => {
+    const next = toggleSound();
+    setSoundActive(next);
+  };
 
   // Factory reset state
   const [resetPassword, setResetPassword] = useState('');
@@ -190,6 +201,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       };
 
       await tenantStorage.saveProfile(updated);
+      playSuccessSound();
       onProfileUpdated(updated);
       setSuccessNotice(true);
       setTimeout(() => {
@@ -197,6 +209,7 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
         onClose();
       }, 900);
     } catch (err: any) {
+      playErrorSound();
       setValidationError(err.message || 'حدث خطأ أثناء حفظ الملف');
     } finally {
       setSaving(false);
@@ -520,6 +533,50 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                     * تُخصم هذه النسبة من هامش الربح الصافي فقط عند حساب سعر الجملة مع حماية وضمان تغطية كافة تكاليف الخامات وأجور اليد العاملة.
                   </span>
                 </div>
+              </div>
+
+              {/* Sound preference (Web Audio API) */}
+              <div className="sm:col-span-2 p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/60 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`p-2.5 rounded-xl transition ${
+                      soundActive
+                        ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400'
+                        : 'bg-stone-200 dark:bg-stone-700 text-stone-500 dark:text-stone-400'
+                    }`}
+                  >
+                    {soundActive ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                      أصوات الورشة التفاعلية
+                    </div>
+                    <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                      نغمات هادئة فورية (ترحيب، تنبيه، نجاح، خطأ، تقليب صفحات) بدون أي ملفات خارجية
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleSound}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                    soundActive
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm shadow-amber-600/20'
+                      : 'bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-200'
+                  }`}
+                >
+                  {soundActive ? (
+                    <>
+                      <Volume2 size={15} />
+                      <span>مفعلة</span>
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX size={15} />
+                      <span>مكتومة</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 

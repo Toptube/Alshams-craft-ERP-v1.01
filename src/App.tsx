@@ -32,9 +32,13 @@ import {
   NewEmployeeModal,
 } from './components/modals/CreationModals';
 import { WorkshopCatalog } from './components/catalog/WorkshopCatalog';
+import { WorkshopHomeScreen } from './components/home/WorkshopHomeScreen';
+import { SupportModal } from './components/support/SupportModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { tenantStorage } from './db/dexieDB';
 import { firestoreService } from './db/firestoreService';
 import { auth, onAuthStateChanged, signOut } from './lib/firebase';
+import { playPageFlipSound } from './lib/sounds';
 import {
   PlusCircle,
   Calculator,
@@ -50,9 +54,18 @@ import {
   Truck,
   FileText,
   BookOpen,
+  ArrowRight,
+  Home,
+  ShieldCheck,
+  Snowflake,
 } from 'lucide-react';
 
+// In-memory cache for session (built once per session, max 500 items per collection to protect Firestore free tier)
+let sessionSearchCache: GlobalSearchDataCache | null = null;
+let sessionSearchCacheTenantId = '';
+
 export type AppActiveView =
+  | 'home'
   | 'create_center'
   | 'calculator'
   | 'sales'
@@ -65,7 +78,8 @@ export type AppActiveView =
   | 'ai_agent'
   | 'archive'
   | 'catalog'
-  | 'reports';
+  | 'reports'
+  | 'admin';
 
 export default function App() {
   // Authentication State
@@ -81,10 +95,13 @@ export default function App() {
   });
 
   // Active View State:
-  const [activeView, setActiveView] = useState<AppActiveView>('create_center');
+  const [activeView, setActiveView] = useState<AppActiveView>('home');
 
   // Mobile Drawer State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Support & Complaints Modal State
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   // Modals for Crafts, Search, Guide, Cloud Migration
   const [isCraftsSelectorOpen, setIsCraftsSelectorOpen] = useState(false);
@@ -148,40 +165,94 @@ export default function App() {
     }
   }, [currentProfile]);
 
-  const loadSearchCache = useCallback(async () => {
-    if (!currentProfile) return;
-    try {
-      const tenantId = currentProfile.tenantId || currentProfile.workshopId || currentProfile.id || '';
-      const [customers, suppliers, products, materials, invoices, workOrders, employees] = await Promise.all([
-        tenantStorage.getCustomers(tenantId).catch(() => []),
-        tenantStorage.getSuppliers(tenantId).catch(() => []),
-        firestoreService.getFinishedProducts(tenantId).catch(() => []),
-        tenantStorage.getRawMaterials(tenantId).catch(() => []),
-        tenantStorage.getOrders(tenantId).catch(() => []),
-        firestoreService.getWorkOrders(tenantId).catch(() => []),
-        tenantStorage.getEmployees(tenantId).catch(() => []),
-      ]);
-      setSearchCache({
-        customers,
-        suppliers,
-        products,
-        materials,
-        invoices: invoices as any,
-        workOrders,
-        employees,
-      });
-    } catch (err) {
-      console.error('Error loading search cache:', err);
+  const loadSearchCache = useCallback(
+    async (forceRefresh = false) => {
+      if (!currentProfile) return;
+      const tenantId =
+        currentProfile.tenantId || currentProfile.workshopId || currentProfile.id || '';
+
+      // 4) للحفاظ على الاستهلاك المجاني: استخدام الفهرس المحفوظ بالذاكرة مرة واحدة لكل جلسة ما لم يُطلب التحديث
+      if (!forceRefresh && sessionSearchCache && sessionSearchCacheTenantId === tenantId) {
+        setSearchCache(sessionSearchCache);
+        return;
+      }
+
+      try {
+        const [
+          customers,
+          suppliers,
+          dexieProducts,
+          firestoreProducts,
+          materials,
+          invoices,
+          supplierInvoices,
+          workOrders,
+          employees,
+          treasuries,
+          expenses,
+        ] = await Promise.all([
+          tenantStorage.getCustomers(tenantId).catch(() => []),
+          tenantStorage.getSuppliers(tenantId).catch(() => []),
+          tenantStorage.getProducts(tenantId).catch(() => []),
+          firestoreService.getFinishedProducts(tenantId).catch(() => []),
+          tenantStorage.getRawMaterials(tenantId).catch(() => []),
+          tenantStorage.getOrders(tenantId).catch(() => []),
+          tenantStorage.getSupplierInvoices(tenantId).catch(() => []),
+          firestoreService.getWorkOrders(tenantId).catch(() => []),
+          tenantStorage.getEmployees(tenantId).catch(() => []),
+          firestoreService.getTreasuries(tenantId).catch(() => []),
+          tenantStorage.getAdminCosts(tenantId).catch(() => []),
+        ]);
+
+        // دمج المنتجات بدون تكرار
+        const pMap = new Map<string, any>();
+        firestoreProducts.forEach((p) => pMap.set(p.id, p));
+        dexieProducts.forEach((p) => pMap.set(p.id, p));
+        const combinedProducts = Array.from(pMap.values()).slice(0, 500);
+
+        const newCache: GlobalSearchDataCache = {
+          customers: customers.slice(0, 500),
+          suppliers: suppliers.slice(0, 500),
+          products: combinedProducts,
+          materials: materials.slice(0, 500),
+          invoices: (invoices as any).slice(0, 500),
+          supplierInvoices: (supplierInvoices as any).slice(0, 500),
+          workOrders: workOrders.slice(0, 500),
+          employees: employees.slice(0, 500),
+          treasuries: treasuries.slice(0, 500),
+          expenses: expenses.slice(0, 500),
+        };
+
+        sessionSearchCache = newCache;
+        sessionSearchCacheTenantId = tenantId;
+        setSearchCache(newCache);
+      } catch (err) {
+        console.error('Error loading search cache:', err);
+      }
+    },
+    [currentProfile]
+  );
+
+  // تشغيل صوت تقليب الصفحة عند التنقل بين الأقسام (لا يُشغل في التحميل الأولي قبل أي تفاعل)
+  const isFirstMountNav = React.useRef(true);
+  useEffect(() => {
+    if (isFirstMountNav.current) {
+      isFirstMountNav.current = false;
+      return;
     }
-  }, [currentProfile]);
+    playPageFlipSound();
+  }, [activeView]);
 
   useEffect(() => {
     if (currentProfile) {
       loadNotifications();
+      // بناء فهرس البحث للجلسة في الخلفية
+      loadSearchCache();
       const interval = setInterval(loadNotifications, 60000);
 
       const handleRealtimeNotif = () => {
         loadNotifications();
+        loadSearchCache(true);
       };
       window.addEventListener('alshams_notifications_changed', handleRealtimeNotif);
 
@@ -190,7 +261,7 @@ export default function App() {
         window.removeEventListener('alshams_notifications_changed', handleRealtimeNotif);
       };
     }
-  }, [currentProfile, loadNotifications]);
+  }, [currentProfile, loadNotifications, loadSearchCache]);
 
   // Apply dark mode class to document
   useEffect(() => {
@@ -366,6 +437,7 @@ export default function App() {
           loadSearchCache();
           setIsGlobalSearchOpen(true);
         }}
+        onGoHome={() => setActiveView('home')}
       />
 
       {/* Mobile Lateral Hamburger Drawer */}
@@ -379,6 +451,8 @@ export default function App() {
             setIsInventoryModalOpen(true);
           } else if (v === 'expenses') {
             setIsAdminCostsModalOpen(true);
+          } else if (v === 'create_center' || v === 'home') {
+            setActiveView('home');
           } else {
             setActiveView(v as AppActiveView);
           }
@@ -392,215 +466,73 @@ export default function App() {
           setIsUserGuideOpen(true);
         }}
         onOpenCloudMigration={() => setIsCloudMigrationOpen(true)}
+        onOpenSupport={() => setIsSupportModalOpen(true)}
         onToggleDarkMode={toggleDarkMode}
         isDarkMode={isDarkMode}
         onLogout={handleLogout}
       />
 
-      {/* Main View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {/* Navigation Breadcrumb / Section Header for Quick Access */}
-        <div className="flex items-center justify-between pb-4 mb-5 border-b border-stone-200/80 dark:border-stone-800">
-          <div className="flex items-center gap-2 overflow-x-auto text-xs font-bold py-1">
-            {/* 1. إنشاء جديد */}
+      {/* Frozen Account Notification Banner */}
+      {currentProfile.isFrozen && (
+        <div className="bg-cyan-700 text-white px-4 py-2.5 text-xs font-bold shadow-md">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Snowflake size={16} className="text-cyan-200 animate-pulse flex-shrink-0" />
+              <span>
+                تنبيه إداري: تم تجميد حساب هذه الورشة ({currentProfile.frozenReason || 'مراجعة المعايير والحساب'}). يرجى التواصل مع إدارة المنظومة.
+              </span>
+            </div>
             <button
               type="button"
-              onClick={() => setActiveView('create_center')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'create_center'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
+              onClick={() => setIsSupportModalOpen(true)}
+              className="px-3 py-1 rounded-lg bg-cyan-800 hover:bg-cyan-900 text-cyan-100 text-[11px] underline transition cursor-pointer"
             >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>إنشاء جديد</span>
-            </button>
-
-            {/* 2. حاسبة تكاليف المنتج */}
-            <button
-              type="button"
-              onClick={() => setActiveView('calculator')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'calculator'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Calculator className="w-3.5 h-3.5" />
-              <span>حاسبة التكاليف</span>
-            </button>
-
-            {/* 3. فواتير المبيعات */}
-            <button
-              type="button"
-              onClick={() => setActiveView('invoices')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'invoices'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>فواتير المبيعات</span>
-            </button>
-
-            {/* 4. طلبيات العملاء */}
-            <button
-              type="button"
-              onClick={() => setActiveView('sales')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'sales'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <ShoppingCart className="w-3.5 h-3.5" />
-              <span>طلبيات العملاء</span>
-            </button>
-
-            {/* 5. أوامر التشغيل */}
-            <button
-              type="button"
-              onClick={() => setActiveView('work_orders')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'work_orders'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Hammer className="w-3.5 h-3.5" />
-              <span>أوامر التشغيل</span>
-            </button>
-
-            {/* 6. الموردون */}
-            <button
-              type="button"
-              onClick={() => setActiveView('suppliers')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'suppliers'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Truck className="w-3.5 h-3.5" />
-              <span>الموردون</span>
-            </button>
-
-            {/* 7. الخامات والوحدات */}
-            <button
-              type="button"
-              onClick={() => setActiveView('materials')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'materials'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              <span>الخامات والوحدات</span>
-            </button>
-
-            {/* 7. الخزن والسيولة */}
-            <button
-              type="button"
-              onClick={() => setActiveView('treasuries')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'treasuries'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Wallet className="w-3.5 h-3.5" />
-              <span>الخزن والسيولة</span>
-            </button>
-
-            {/* 8. كادر العمالة HR */}
-            <button
-              type="button"
-              onClick={() => setActiveView('hr')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'hr'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Users2 className="w-3.5 h-3.5" />
-              <span>كادر العمالة HR</span>
-            </button>
-
-            {/* 9. صقر الشمساوية AI */}
-            <button
-              type="button"
-              onClick={() => setActiveView('ai_agent')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'ai_agent'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>صقر الشمساوية AI</span>
-            </button>
-
-            {/* 10. الأرشيف */}
-            <button
-              type="button"
-              onClick={() => setActiveView('archive')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'archive'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <FolderArchive className="w-3.5 h-3.5" />
-              <span>الأرشيف</span>
-            </button>
-
-            {/* 11. كتالوج الورشة */}
-            <button
-              type="button"
-              onClick={() => setActiveView('catalog')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'catalog'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>كتالوج الورشة</span>
-            </button>
-
-            {/* 12. التقارير */}
-            <button
-              type="button"
-              onClick={() => setActiveView('reports')}
-              className={`px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeView === 'reports'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/20'
-                  : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border'
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>التقارير المالية</span>
-            </button>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsInventoryModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 dark:bg-stone-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-stone-700 dark:text-stone-300 border flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <Boxes className="w-3.5 h-3.5 text-amber-600" />
-              <span>المخازن وكارت الصنف</span>
+              الدعم الفني والشكاوى
             </button>
           </div>
         </div>
+      )}
+
+      {/* Main View Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+        {/* Back to Home Bar when on any module screen (No icons row left) */}
+        {activeView !== 'home' && activeView !== 'create_center' && (
+          <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-stone-200/80 dark:border-stone-800">
+            <button
+              type="button"
+              onClick={() => setActiveView('home')}
+              className="px-3.5 py-1.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 text-xs font-black transition flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            >
+              <ArrowRight className="w-3.5 h-3.5 text-amber-600" />
+              <span>العودة للرئيسية</span>
+            </button>
+            <div className="text-xs font-bold text-stone-500">
+              <span>نظام الشمس كرافت • {currentProfile.brandName}</span>
+            </div>
+          </div>
+        )}
 
         {/* ACTIVE VIEW RENDERING */}
-        {activeView === 'create_center' && (
-          <CreateCenterDashboard
+        {(activeView === 'home' || activeView === 'create_center') && (
+          <WorkshopHomeScreen
             profile={currentProfile}
+            onNavigateToCalculator={() => setActiveView('calculator')}
+            onNavigateToArchive={() => setActiveView('archive')}
+            onNavigateToCatalog={() => setActiveView('catalog')}
+            onNavigateToAIAgent={() => setActiveView('ai_agent')}
+            onNavigateToMaterials={(openAdd) => {
+              if (openAdd) setOpenAddMaterialInView(true);
+              setActiveView('materials');
+            }}
+            onNavigateToSuppliers={() => setActiveView('suppliers')}
+            onNavigateToSales={(mode) => setActiveView('sales')}
+            onNavigateToInvoices={(filter) => setActiveView('invoices')}
+            onNavigateToWorkOrders={(mode) => setActiveView('work_orders')}
+            onNavigateToTreasuries={() => setActiveView('treasuries')}
+            onNavigateToHR={() => setActiveView('hr')}
+            onNavigateToReports={() => setActiveView('reports')}
+            onOpenInventoryModal={(tab) => setIsInventoryModalOpen(true)}
+            onOpenAdminCostsModal={() => setIsAdminCostsModalOpen(true)}
             onOpenNewMaterialModal={() => {
               setOpenAddMaterialInView(true);
               setActiveView('materials');
@@ -621,9 +553,7 @@ export default function App() {
               setSupplierModalLocked(true);
               setIsNewSupplierModalOpen(true);
             }}
-            onNavigateToSales={() => setActiveView('sales')}
             onOpenNewEmployeeModal={() => setIsNewEmployeeModalOpen(true)}
-            onNavigateToCalculator={() => setActiveView('calculator')}
           />
         )}
 
@@ -731,8 +661,24 @@ export default function App() {
           />
         )}
 
+        {activeView === 'catalog' && (
+          <WorkshopCatalog
+            profile={currentProfile}
+            onSelectRecordToLoad={handleSelectRecordFromArchive}
+            onOpenWhatsAppShare={handleOpenWhatsAppShare}
+          />
+        )}
+
         {activeView === 'reports' && (
           <SaaSReportsAnalyticsView profile={currentProfile} />
+        )}
+
+        {activeView === 'admin' && (
+          <AdminDashboard
+            profile={currentProfile}
+            onNavigateHome={() => setActiveView('home')}
+            onProfileUpdated={(updated) => setCurrentProfile(updated)}
+          />
         )}
       </main>
 
@@ -830,14 +776,43 @@ export default function App() {
         isOpen={isGlobalSearchOpen}
         onClose={() => setIsGlobalSearchOpen(false)}
         cache={searchCache}
-        onSelectResult={(cat) => {
+        onSelectResult={(categoryKey, rawItem, extraAction) => {
           setIsGlobalSearchOpen(false);
-          if (cat === 'customers' || cat === 'invoices') setActiveView('invoices');
-          else if (cat === 'suppliers') setActiveView('suppliers');
-          else if (cat === 'workOrders') setActiveView('work_orders');
-          else if (cat === 'employees') setActiveView('hr');
-          else if (cat === 'products') setActiveView('archive');
-          else if (cat === 'materials') setIsInventoryModalOpen(true);
+          if (categoryKey === 'screens') {
+            if (rawItem?.targetView) {
+              setActiveView(rawItem.targetView as AppActiveView);
+            } else if (rawItem?.targetModal === 'expenses') {
+              setIsAdminCostsModalOpen(true);
+            } else if (rawItem?.targetModal === 'guide') {
+              setUserGuideSection(undefined);
+              setIsUserGuideOpen(true);
+            }
+          } else if (categoryKey === 'guide') {
+            if (extraAction?.type === 'guide_section') {
+              setUserGuideSection(extraAction.sectionId);
+            } else {
+              setUserGuideSection(undefined);
+            }
+            setIsUserGuideOpen(true);
+          } else if (categoryKey === 'customers') {
+            setActiveView('sales');
+          } else if (categoryKey === 'invoices') {
+            setActiveView('invoices');
+          } else if (categoryKey === 'suppliers' || categoryKey === 'supplierInvoices') {
+            setActiveView('suppliers');
+          } else if (categoryKey === 'workOrders') {
+            setActiveView('work_orders');
+          } else if (categoryKey === 'employees') {
+            setActiveView('hr');
+          } else if (categoryKey === 'products') {
+            setActiveView('archive');
+          } else if (categoryKey === 'materials') {
+            setIsInventoryModalOpen(true);
+          } else if (categoryKey === 'treasuries') {
+            setActiveView('treasuries');
+          } else if (categoryKey === 'expenses') {
+            setIsAdminCostsModalOpen(true);
+          }
         }}
       />
 
@@ -865,6 +840,13 @@ export default function App() {
         onClose={handleCloseWelcomeModal}
         profile={currentProfile}
         type={welcomeType}
+      />
+
+      {/* Support & Complaints Modal (الدعم الفني والشكاوى) */}
+      <SupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        profile={currentProfile}
       />
 
       {/* Footer Attribution Watermark */}
